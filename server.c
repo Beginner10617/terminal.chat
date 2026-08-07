@@ -1,16 +1,16 @@
 #include "hashmap.h"
+#define PROTOCOL_IMPLEMENTATION
+#include "protocol.h"
 #include <arpa/inet.h>
 #include <assert.h>
 #include <ifaddrs.h>
-#include <netinet/in.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/errno.h>
 #include <sys/socket.h>
-#include <sys/types.h>
+#include <unistd.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 4096 // 4 kb
@@ -79,6 +79,12 @@ int main(int argc, char *argv[]) {
     printf("Connected client with file_descriptor = %d\n",
            tmp_client->file_descriptor);
     // process each client in the hashmap
+    request req;
+    if (read(tmp_client->file_descriptor, &req, sizeof(req)) < 0) {
+      printf("error recieving request : %s\n", strerror(errno));
+      return 1;
+    }
+    debug_print_request(req);
   }
 
   return 0;
