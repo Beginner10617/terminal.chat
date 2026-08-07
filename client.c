@@ -1,3 +1,5 @@
+#include <stddef.h>
+#include <stdint.h>
 #define PROTOCOL_IMPLEMENTATION
 #include "protocol.h"
 #include <arpa/inet.h>
@@ -54,11 +56,8 @@ int main(int argc, char *argv[]) {
 
   // handle connection
   printf("Connected to server\n");
-  request req = create_req(LOGIN, "HELLO WORLD");
-  if (write(client, &req, sizeof(req)) < 0) {
-    printf("error sending to the server : %s\n", strerror(errno));
-    return 1;
-  }
+  request req = create_req_from_cstr(LOGIN, "HELLO WORLD!");
+  send_req(client, req);
   printf("request sent!");
 
   close(client);

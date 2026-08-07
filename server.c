@@ -1,4 +1,5 @@
 #include "hashmap.h"
+#include <stdint.h>
 #define PROTOCOL_IMPLEMENTATION
 #include "protocol.h"
 #include <arpa/inet.h>
@@ -78,12 +79,10 @@ int main(int argc, char *argv[]) {
     hashmap_put(addr_map, tmp_client->file_descriptor, tmp_client);
     printf("Connected client with file_descriptor = %d\n",
            tmp_client->file_descriptor);
+
     // process each client in the hashmap
-    request req;
-    if (read(tmp_client->file_descriptor, &req, sizeof(req)) < 0) {
-      printf("error recieving request : %s\n", strerror(errno));
-      return 1;
-    }
+    request req = recv_req(tmp_client->file_descriptor);
+    printf("Recieved request\n");
     debug_print_request(req);
   }
 
