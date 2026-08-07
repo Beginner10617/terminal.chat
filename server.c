@@ -1,5 +1,7 @@
 #include "hashmap.h"
+#include <arpa/inet.h>
 #include <assert.h>
+#include <ifaddrs.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -8,6 +10,7 @@
 #include <string.h>
 #include <sys/errno.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 4096 // 4 kb
@@ -23,7 +26,7 @@ typedef struct {
 int main(int argc, char *argv[]) {
   int server = socket(AF_INET, SOCK_STREAM, 0);
   if (server == -1) {
-    printf("error creating socket");
+    printf("error creating socket\n");
     return 1;
   }
   struct sockaddr_in addr = {
@@ -34,21 +37,34 @@ int main(int argc, char *argv[]) {
 
   int tmp_i = 1;
   if (setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &tmp_i, sizeof(tmp_i)) < 0) {
-    printf("error setsockopt : %s", strerror(errno));
+    printf("error setsockopt : %s\n", strerror(errno));
     return 1;
   }
 
   if (bind(server, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-    printf("error binding : %s", strerror(errno));
+    printf("error binding : %s\n", strerror(errno));
     return 1;
   }
   if (listen(server, SOMAXCONN) < 0) { // max 5 connection queue
-    printf("error listening : %s", strerror(errno));
+    printf("error listening : %s\n", strerror(errno));
     return 1;
   }
   HashMap *addr_map = hashmap_create(16);
 
   printf("Server running on port %d\n", PORT);
+  struct ifaddrs *if_addr;
+  if (getifaddrs(&if_addr) < 0) {
+    printf("error getifaddrs : %s\n", strerror(errno));
+  }
+  for (struct ifaddrs *ifa = if_addr; ifa != NULL; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
+      char ip[INET_ADDRSTRLEN];
+      inet_ntop(AF_INET, &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr, ip,
+                sizeof(ip));
+      printf("%s: %s\n", ifa->ifa_name, ip);
+    }
+  }
+
   while (true) {
     client *tmp_client = malloc(sizeof(client));
     tmp_client->addr_len = sizeof(tmp_client->addr);
