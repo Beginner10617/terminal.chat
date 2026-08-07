@@ -9,10 +9,37 @@
 #define MAX_LENGTH 512
 
 typedef enum {
-  LOGIN,
-  MESSAGE_SEND,
-  CHAT_ACCESS,
-} REQUEST_KIND;
+  // login for existing users
+  REQ_LOGIN,
+  RSP_LOGIN,
+  // signup for new users
+  REQ_SIGN_UP,
+  RSP_SIGN_UP,
+  // logout
+  REQ_LOGOUT,
+  RSP_LOGOUT,
+  // search other users to chat
+  REQ_SEARCH_USER,
+  RSP_SEARCH_USER,
+  // request user info or a particular username (bio etc)
+  REQ_USER_INFO,
+  RSP_USER_INFO,
+  // send message to other users
+  REQ_MESSAGE_SEND,
+  RSP_MESSAGE_SEND,
+  NTF_MESSAGE_RECV,
+  // list all the people you've chatted with recently
+  REQ_CHAT_ACCESS,
+  RSP_CHAT_ACCESS,
+  // open your dms with a particular user
+  REQ_DM_ACCESS,
+  RSP_DM_ACCESS,
+  // pinging
+  REQ_PING,
+  RSP_PONG,
+  // generic error
+  RSP_ERROR,
+} REQUEST_RESPONSE_KIND;
 
 typedef struct {
   uint8_t kind, length, *data;
@@ -87,14 +114,16 @@ void debug_print_request_kind(uint8_t req_k) {
   }
 }
 
-void debug_print_request(request req){
-  printf("Kind : "); debug_print_request_kind(req.kind);
+void debug_print_request(request req) {
+  printf("Kind : ");
+  debug_print_request_kind(req.kind);
   printf("\nLength : %u\nData :\n", req.length);
-  for(uint8_t i = 0; i < req.length; i++) printf("%x ", req.data[i]);
+  for (uint8_t i = 0; i < req.length; i++)
+    printf("%x ", req.data[i]);
   printf("\n");
 }
 
-request recv_req(int file_descriptor){
+request recv_req(int file_descriptor) {
   uint8_t req_header[2];
   if (read(file_descriptor, &req_header, sizeof(req_header)) < 0) {
     printf("error recieving request : %s\n", strerror(errno));
@@ -112,7 +141,7 @@ request recv_req(int file_descriptor){
   return output;
 }
 
-void send_req(int file_descriptor, request req){
+void send_req(int file_descriptor, request req) {
   size_t sz = size(req);
   uint8_t *flat_req = flatten(req);
 
