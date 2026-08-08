@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 
   // handle connection
   printf("Connected to server\n");
-  request req = create_req_from_cstr(LOGIN, "HELLO WORLD!");
+  request req = create_req_from_cstr(REQ_LOGIN, "HELLO WORLD!");
   send_req(client, req);
   printf("request sent!");
 

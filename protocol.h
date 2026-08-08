@@ -6,9 +6,10 @@
 #include <string.h>
 #include <sys/errno.h>
 #include <unistd.h>
-#define MAX_LENGTH 512
 
 typedef enum {
+  // disconnect
+  DISCONNECT,
   // login for existing users
   REQ_LOGIN,
   RSP_LOGIN,
@@ -99,13 +100,13 @@ void destroy_request(request *req) {
 
 void debug_print_request_kind(uint8_t req_k) {
   switch (req_k) {
-  case LOGIN:
+  case REQ_LOGIN:
     printf("LOGIN");
     break;
-  case MESSAGE_SEND:
+  case REQ_MESSAGE_SEND:
     printf("MESSAGE_SEND");
     break;
-  case CHAT_ACCESS:
+  case REQ_CHAT_ACCESS:
     printf("CHAT_ACCESS");
     break;
   default:
@@ -125,9 +126,13 @@ void debug_print_request(request req) {
 
 request recv_req(int file_descriptor) {
   uint8_t req_header[2];
-  if (read(file_descriptor, &req_header, sizeof(req_header)) < 0) {
+  ssize_t num = read(file_descriptor, &req_header, sizeof(req_header));
+  if (num < 0) {
     printf("error recieving request : %s\n", strerror(errno));
     exit(EXIT_FAILURE);
+  }
+  if (num == 0) {
+    return (request){.kind = DISCONNECT, .length = 0};
   }
   printf("Header : %x %x\n", req_header[0], req_header[1]);
   uint8_t *req_payload = malloc(req_header[1]);

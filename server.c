@@ -1,4 +1,4 @@
-#include "hashmap.h"
+#include <poll.h>
 #include <stdint.h>
 #define PROTOCOL_IMPLEMENTATION
 #include "protocol.h"
@@ -15,6 +15,7 @@
 
 #define PORT 8080
 #define BUFFER_SIZE 4096 // 4 kb
+#define TIMEOUT_MS 5
 
 typedef struct {
   int file_descriptor;
@@ -23,6 +24,27 @@ typedef struct {
   char buf[BUFFER_SIZE];
   bool is_connected;
 } client;
+
+typedef struct {
+  client *clients;
+  size_t size, cap;
+} dyn_arr_client;
+
+void init_dyn_arr_client(dyn_arr_client *arr) {
+  arr->clients = malloc(sizeof(client));
+  arr->size = 0;
+  arr->cap = 1;
+}
+
+void append_dyn_arr_client(client _client, dyn_arr_client *arr) {
+  if (arr->size >= arr->cap) {
+    while (arr->size >= arr->cap)
+      arr->cap *= 2;
+    arr->clients = realloc(arr->clients, sizeof(client) * arr->cap);
+  }
+  arr->clients[arr->size] = _client;
+  arr->size++;
+}
 
 int main(int argc, char *argv[]) {
   int server = socket(AF_INET, SOCK_STREAM, 0);
@@ -50,7 +72,9 @@ int main(int argc, char *argv[]) {
     printf("error listening : %s\n", strerror(errno));
     return 1;
   }
-  HashMap *addr_map = hashmap_create(16);
+
+  dyn_arr_client client_list;
+  init_dyn_arr_client(&client_list);
 
   printf("Server running on port %d\n", PORT);
   struct ifaddrs *if_addr;
@@ -67,23 +91,47 @@ int main(int argc, char *argv[]) {
   }
 
   while (true) {
-    client *tmp_client = malloc(sizeof(client));
-    tmp_client->addr_len = sizeof(tmp_client->addr);
-    tmp_client->file_descriptor = accept(
-        server, (struct sockaddr *)&tmp_client->addr, &tmp_client->addr_len);
-    if (tmp_client->file_descriptor < 0) {
-      free(tmp_client);
+    size_t fd_count = client_list.size + 1;
+    struct pollfd all_fd[fd_count];
+    all_fd[0].fd = server;
+    all_fd[0].events = POLLIN;
+
+    for (size_t i = 1; i < fd_count; i++) {
+      all_fd[i].fd = client_list.clients[i - 1].file_descriptor;
+      all_fd[i].events = POLLIN;
+    }
+
+    if (poll(all_fd, fd_count, TIMEOUT_MS) < 0) {
+      printf("error getifaddrs : %s\n", strerror(errno));
       continue;
     }
-    tmp_client->is_connected = true;
-    hashmap_put(addr_map, tmp_client->file_descriptor, tmp_client);
-    printf("Connected client with file_descriptor = %d\n",
-           tmp_client->file_descriptor);
 
-    // process each client in the hashmap
-    request req = recv_req(tmp_client->file_descriptor);
-    printf("Recieved request\n");
-    debug_print_request(req);
+    if (all_fd[0].revents & POLLIN) {
+      client tmp_client;
+      tmp_client.addr_len = sizeof(tmp_client.addr);
+      tmp_client.file_descriptor = accept(
+          server, (struct sockaddr *)&tmp_client.addr, &tmp_client.addr_len);
+      if (tmp_client.file_descriptor < 0) {
+        continue;
+      }
+      tmp_client.is_connected = true;
+      append_dyn_arr_client(tmp_client, &client_list);
+      printf("Connected client with file_descriptor = %d\n",
+             tmp_client.file_descriptor);
+    }
+    for (size_t i = 1; i < fd_count; i++) {
+      if (!client_list.clients[i - 1].is_connected)
+        continue;
+      if (all_fd[i].revents & POLLIN) {
+        printf("Recieved request\n");
+        request req = recv_req(all_fd[i].fd);
+        if (req.kind == DISCONNECT) {
+          client_list.clients[i - 1].is_connected = false;
+          printf("Disconnected fd = %d\n", all_fd[i].fd);
+        }
+        debug_print_request(req);
+      }
+    }
   }
 
   return 0;
