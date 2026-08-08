@@ -46,6 +46,22 @@ void append_dyn_arr_client(client _client, dyn_arr_client *arr) {
   arr->size++;
 }
 
+void clear_dyn_arr_client(dyn_arr_client *arr) { // remove all disconnected
+  ssize_t last_connected = arr->size - 1;
+  while (last_connected >= 0 && !arr->clients[last_connected].is_connected)
+    last_connected--;
+  for (ssize_t curr = last_connected; curr >= 0; curr--) {
+    if (!arr->clients[curr].is_connected) {
+      close(arr->clients[curr].file_descriptor);
+      client tmp = arr->clients[last_connected];
+      arr->clients[last_connected] = arr->clients[curr];
+      arr->clients[curr] = tmp;
+      last_connected--;
+    }
+  }
+  arr->size = last_connected + 1;
+}
+
 int main(int argc, char *argv[]) {
   int server = socket(AF_INET, SOCK_STREAM, 0);
   if (server == -1) {
@@ -102,7 +118,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (poll(all_fd, fd_count, TIMEOUT_MS) < 0) {
-      printf("error getifaddrs : %s\n", strerror(errno));
+      printf("error poll : %s\n", strerror(errno));
       continue;
     }
 
@@ -132,6 +148,7 @@ int main(int argc, char *argv[]) {
         debug_print_request(req);
       }
     }
+    clear_dyn_arr_client(&client_list);
   }
 
   return 0;
