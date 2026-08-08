@@ -1,5 +1,6 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,6 +60,8 @@ void destroy_request(request *req);
 
 request recv_req(int file_descriptor);
 void send_req(int file_descriptor, request req);
+
+void process_request(request req);
 
 // #define PROTOCOL_IMPLEMENTATION
 #ifdef PROTOCOL_IMPLEMENTATION
@@ -190,7 +193,13 @@ request recv_req(int file_descriptor) {
     exit(EXIT_FAILURE);
   }
   if (num == 0) {
-    return (request){.kind = DISCONNECT, .length = 0};
+    uint8_t *fd_data = malloc(sizeof(4));
+    fd_data[0] = file_descriptor & 0xFF;
+    fd_data[1] = (file_descriptor >> 8) & 0xFF;
+    fd_data[2] = (file_descriptor >> 16) & 0xFF;
+    fd_data[3] = (file_descriptor >> 24) & 0xFF;
+
+    return (request){.kind = DISCONNECT, .length = 4, .data = fd_data};
   }
   uint8_t *req_payload = malloc(req_header[1]);
   if (read(file_descriptor, req_payload, req_header[1]) < 0) {
@@ -208,6 +217,30 @@ void send_req(int file_descriptor, request req) {
   if (write(file_descriptor, flat_req, sz) < 0) {
     printf("error sending to the server : %s\n", strerror(errno));
     exit(EXIT_FAILURE);
+  }
+}
+
+// helper
+bool is_num(char *c_str) {
+  char *x = c_str;
+  while (*x) {
+    if (*x < '0' || *x > '9')
+      return false;
+    x++;
+  }
+  return true;
+}
+void process_request(request req) {
+  printf("Processing : ");
+  debug_print_request(req);
+  printf("\n");
+
+  if (req.kind == DISCONNECT) {
+    uint8_t *fd_data = req.data;
+    int fd = (int)fd_data[0] | ((int)fd_data[1] << 8) |
+             ((int)fd_data[2] << 16) | ((int)fd_data[3] << 24);
+    printf("disconnected file_descriptor = %d\n", fd);
+    close(fd);
   }
 }
 #endif

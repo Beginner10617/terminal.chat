@@ -1,4 +1,5 @@
 #include <poll.h>
+#include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>
 #define PROTOCOL_IMPLEMENTATION
@@ -15,14 +16,13 @@
 #include <unistd.h>
 
 #define PORT 8080
-#define BUFFER_SIZE 4096 // 4 kb
 #define TIMEOUT_MS 5
+#define DEF_THREADS 0
 
 typedef struct {
   int file_descriptor;
   struct sockaddr_storage addr;
   socklen_t addr_len;
-  char buf[BUFFER_SIZE];
   bool is_connected;
 } client;
 
@@ -105,6 +105,7 @@ void push_request_queue(request_queue *que, request req) {
 void pop_request_queue(request_queue *que) {
   if (que->size == 0)
     return;
+  free(que->requests[que->front].data);
   que->front = (que->front + 1) % que->cap;
   que->size--;
 }
@@ -119,7 +120,44 @@ void debug_print_queue(request_queue que) {
   printf("])");
 }
 
+bool is_empty_request_queue(request_queue que) { return que.size == 0; }
+
+typedef struct {
+  request_queue que;
+  pthread_cond_t cond;
+  pthread_mutex_t mutex;
+  size_t t_id;
+} worker_args;
+
+size_t get_worker_thread(int file_descriptor, int num_threads) {
+  return file_descriptor % num_threads;
+}
+
+void *worker_process(void *arg) {
+  worker_args *w_args = arg;
+  while (1) {
+    pthread_mutex_lock(&w_args->mutex);
+    while (is_empty_request_queue(w_args->que))
+      pthread_cond_wait(&w_args->cond, &w_args->mutex);
+    request req = front_request_queue(w_args->que);
+    printf("t_id : %zu queue size : %zu ", w_args->t_id, w_args->que.size);
+    process_request(req);
+    pop_request_queue(&w_args->que);
+    pthread_mutex_unlock(&w_args->mutex);
+  }
+}
+
 int main(int argc, char *argv[]) {
+  int n_threads = DEF_THREADS;
+  if (argc == 2) {
+    if (!is_num(argv[1])) {
+      printf("Usage : %s [n_threads]\nProvided n_threads %s isn't valid\n",
+             argv[0], argv[1]);
+      return 1;
+    }
+    n_threads = atoi(argv[1]);
+  }
+
   int server = socket(AF_INET, SOCK_STREAM, 0);
   if (server == -1) {
     printf("error creating socket\n");
@@ -148,9 +186,23 @@ int main(int argc, char *argv[]) {
 
   dyn_arr_client client_list;
   init_dyn_arr_client(&client_list);
+  request_queue sequential_que;
+  if (!n_threads)
+    init_request_queue(&sequential_que);
 
-  request_queue req_que;
-  init_request_queue(&req_que);
+  worker_args args[n_threads];
+  for (size_t i = 0; i < n_threads; i++) {
+    init_request_queue(&args[i].que);
+    pthread_cond_init(&args[i].cond, NULL);
+    pthread_mutex_init(&args[i].mutex, NULL);
+    args[i].t_id = i + 1;
+  }
+
+  pthread_t threads[n_threads];
+
+  for (size_t i = 0; i < n_threads; i++) {
+    pthread_create(&threads[i], NULL, worker_process, &args[i]);
+  }
 
   printf("Server running on port %d\n", PORT);
   struct ifaddrs *if_addr;
@@ -196,17 +248,32 @@ int main(int argc, char *argv[]) {
              tmp_client.file_descriptor);
     }
     for (size_t i = 1; i < fd_count; i++) {
-      if (!client_list.clients[i - 1].is_connected)
+      client *tmp_client = &client_list.clients[i - 1];
+      if (!tmp_client->is_connected)
         continue;
       if (all_fd[i].revents & POLLIN) {
         request req = recv_req(all_fd[i].fd);
-        if (req.kind == DISCONNECT) {
-          client_list.clients[i - 1].is_connected = false;
-          printf("Disconnected fd = %d\n", all_fd[i].fd);
+        if (req.kind == DISCONNECT)
+          tmp_client->is_connected = false;
+
+        if (n_threads) {
+          size_t t_id =
+              get_worker_thread(tmp_client->file_descriptor, n_threads);
+          pthread_mutex_lock(&args[t_id].mutex);
+          push_request_queue(&args[t_id].que, req);
+          pthread_cond_signal(&args[t_id].cond);
+          pthread_mutex_unlock(&args[t_id].mutex);
+        } else {
+          push_request_queue(&sequential_que, req);
         }
-        push_request_queue(&req_que, req);
-        debug_print_queue(req_que);
-        printf("\n");
+      }
+    }
+
+    if (n_threads == 0) {
+      while (!is_empty_request_queue(sequential_que)) {
+        request req = front_request_queue(sequential_que);
+        process_request(req);
+        pop_request_queue(&sequential_que);
       }
     }
     clear_dyn_arr_client(&client_list);

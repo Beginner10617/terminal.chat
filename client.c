@@ -13,16 +13,6 @@
 #define DEF_IP "127.0.0.1"
 #define DEF_PORT 8080
 
-bool is_num(char *c_str) {
-  char *x = c_str;
-  while (*x) {
-    if (*x < '0' || *x > '9')
-      return false;
-    x++;
-  }
-  return true;
-}
-
 int main(int argc, char *argv[]) {
   char *ip_addr = DEF_IP;
   int port = DEF_PORT;
@@ -31,7 +21,7 @@ int main(int argc, char *argv[]) {
   } else if (argc == 3) {
     ip_addr = argv[1];
     if (!is_num(argv[2])) {
-      printf("Usage : %s <ip-addr> <port>\nProvided port %s isn't valid\n",
+      printf("Usage : %s [<ip-addr>] [<port>]\nProvided port %s isn't valid\n",
              argv[0], argv[2]);
       return 1;
     }
