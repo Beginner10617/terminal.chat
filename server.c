@@ -1,4 +1,5 @@
 #include <poll.h>
+#include <stddef.h>
 #include <stdint.h>
 #define PROTOCOL_IMPLEMENTATION
 #include "protocol.h"
@@ -62,6 +63,62 @@ void clear_dyn_arr_client(dyn_arr_client *arr) { // remove all disconnected
   arr->size = last_connected + 1;
 }
 
+typedef struct {
+  request *requests;
+  size_t size, cap, front, rear;
+} request_queue;
+
+void init_request_queue(request_queue *que) {
+  que->requests = malloc(sizeof(request));
+  que->cap = 1;
+  que->size = 0;
+  que->front = 0;
+  que->rear = 0;
+}
+
+request front_request_queue(request_queue que) {
+  return que.requests[que.front];
+}
+
+void push_request_queue(request_queue *que, request req) {
+  if (que->size == que->cap) {
+    size_t new_cap = que->cap * 2;
+    request *tmp = malloc(sizeof(request) * new_cap);
+    assert(tmp);
+    for (size_t i = 0; i < que->size; i++) {
+      tmp[i] = que->requests[(que->front + i) % que->cap];
+    }
+    tmp[que->size] = req;
+    que->size++;
+    que->cap = new_cap;
+    que->front = 0;
+    que->rear = que->size;
+    free(que->requests);
+    que->requests = tmp;
+    return;
+  }
+  que->requests[que->rear] = req;
+  que->rear = (que->rear + 1) % que->cap;
+  que->size++;
+}
+
+void pop_request_queue(request_queue *que) {
+  if (que->size == 0)
+    return;
+  que->front = (que->front + 1) % que->cap;
+  que->size--;
+}
+
+void debug_print_queue(request_queue que) {
+  printf("Queue([");
+  for (size_t i = 0; i < que.size; i++) {
+    debug_print_request(que.requests[(que.front + i) % que.cap]);
+    if (i != que.size - 1)
+      printf(", ");
+  }
+  printf("])");
+}
+
 int main(int argc, char *argv[]) {
   int server = socket(AF_INET, SOCK_STREAM, 0);
   if (server == -1) {
@@ -91,6 +148,9 @@ int main(int argc, char *argv[]) {
 
   dyn_arr_client client_list;
   init_dyn_arr_client(&client_list);
+
+  request_queue req_que;
+  init_request_queue(&req_que);
 
   printf("Server running on port %d\n", PORT);
   struct ifaddrs *if_addr;
@@ -139,13 +199,14 @@ int main(int argc, char *argv[]) {
       if (!client_list.clients[i - 1].is_connected)
         continue;
       if (all_fd[i].revents & POLLIN) {
-        printf("Recieved request\n");
         request req = recv_req(all_fd[i].fd);
         if (req.kind == DISCONNECT) {
           client_list.clients[i - 1].is_connected = false;
           printf("Disconnected fd = %d\n", all_fd[i].fd);
         }
-        debug_print_request(req);
+        push_request_queue(&req_que, req);
+        debug_print_queue(req_que);
+        printf("\n");
       }
     }
     clear_dyn_arr_client(&client_list);

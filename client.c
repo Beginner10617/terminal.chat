@@ -43,13 +43,13 @@ int main(int argc, char *argv[]) {
                              .sin_addr.s_addr = inet_addr(ip_addr)};
   socklen_t addr_len = sizeof(addr);
 
-  int client = socket(AF_INET, SOCK_STREAM, 0);
-  if (client == -1) {
+  int server = socket(AF_INET, SOCK_STREAM, 0);
+  if (server == -1) {
     printf("error creating socket\n");
     return 1;
   }
 
-  if (connect(client, (struct sockaddr *)&addr, addr_len) < 0) {
+  if (connect(server, (struct sockaddr *)&addr, addr_len) < 0) {
     printf("error connecting to the server : %s\n", strerror(errno));
     return 1;
   }
@@ -57,10 +57,10 @@ int main(int argc, char *argv[]) {
   // handle connection
   printf("Connected to server\n");
   request req = create_req_from_cstr(REQ_LOGIN, "HELLO WORLD!");
-  send_req(client, req);
+  send_req(server, req);
   printf("request sent!");
 
-  close(client);
+  close(server);
 
   return 0;
 }

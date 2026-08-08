@@ -100,15 +100,70 @@ void destroy_request(request *req) {
 
 void debug_print_request_kind(uint8_t req_k) {
   switch (req_k) {
+  case DISCONNECT:
+    printf("DISCONNECT");
+    break;
   case REQ_LOGIN:
-    printf("LOGIN");
+    printf("REQ_LOGIN");
+    break;
+  case RSP_LOGIN:
+    printf("RSP_LOGIN");
+    break;
+  case REQ_SIGN_UP:
+    printf("REQ_SIGN_UP");
+    break;
+  case RSP_SIGN_UP:
+    printf("RSP_SIGN_UP");
+    break;
+  case REQ_LOGOUT:
+    printf("REQ_LOGOUT");
+    break;
+  case RSP_LOGOUT:
+    printf("RSP_LOGOUT");
+    break;
+  case REQ_SEARCH_USER:
+    printf("REQ_SEARCH_USER");
+    break;
+  case RSP_SEARCH_USER:
+    printf("RSP_SEARCH_USER");
+    break;
+  case REQ_USER_INFO:
+    printf("REQ_USER_INFO");
+    break;
+  case RSP_USER_INFO:
+    printf("RSP_USER_INFO");
     break;
   case REQ_MESSAGE_SEND:
-    printf("MESSAGE_SEND");
+    printf("REQ_MESSAGE_SEND");
+    break;
+  case RSP_MESSAGE_SEND:
+    printf("RSP_MESSAGE_SEND");
+    break;
+  case NTF_MESSAGE_RECV:
+    printf("NTF_MESSAGE_RECV");
     break;
   case REQ_CHAT_ACCESS:
-    printf("CHAT_ACCESS");
+    printf("REQ_CHAT_ACCESS");
     break;
+  case RSP_CHAT_ACCESS:
+    printf("RSP_CHAT_ACCESS");
+    break;
+  case REQ_DM_ACCESS:
+    printf("REQ_DM_ACCESS");
+    break;
+  case RSP_DM_ACCESS:
+    printf("RSP_DM_ACCESS");
+    break;
+  case REQ_PING:
+    printf("REQ_PING");
+    break;
+  case RSP_PONG:
+    printf("RSP_PONG");
+    break;
+  case RSP_ERROR:
+    printf("RSP_ERROR");
+    break;
+
   default:
     printf("Unknown");
     break;
@@ -116,12 +171,15 @@ void debug_print_request_kind(uint8_t req_k) {
 }
 
 void debug_print_request(request req) {
-  printf("Kind : ");
+  printf("Request(");
   debug_print_request_kind(req.kind);
-  printf("\nLength : %u\nData :\n", req.length);
-  for (uint8_t i = 0; i < req.length; i++)
-    printf("%x ", req.data[i]);
-  printf("\n");
+  printf(", %u, [", req.length);
+  for (uint8_t i = 0; i < req.length; i++) {
+    printf("%x", req.data[i]);
+    if (i != req.length - 1)
+      printf(" ");
+  }
+  printf("])");
 }
 
 request recv_req(int file_descriptor) {
@@ -134,15 +192,12 @@ request recv_req(int file_descriptor) {
   if (num == 0) {
     return (request){.kind = DISCONNECT, .length = 0};
   }
-  printf("Header : %x %x\n", req_header[0], req_header[1]);
   uint8_t *req_payload = malloc(req_header[1]);
   if (read(file_descriptor, req_payload, req_header[1]) < 0) {
     printf("error recieving request : %s\n", strerror(errno));
     exit(EXIT_FAILURE);
   }
-  printf("Read the data!\n");
   request output = re_construct(req_header, req_payload);
-  printf("Re-constructed!\n");
   return output;
 }
 
