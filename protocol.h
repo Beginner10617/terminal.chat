@@ -35,7 +35,6 @@ typedef enum {
   // send message to other users
   REQ_MESSAGE_SEND,
   RSP_MESSAGE_SEND,
-  NTF_MESSAGE_RECV,
   // list all the people you've chatted with recently
   REQ_CHAT_ACCESS,
   RSP_CHAT_ACCESS,
