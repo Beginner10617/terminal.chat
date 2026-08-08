@@ -21,8 +21,8 @@ int main(int argc, char *argv[]) {
   } else if (argc == 3) {
     ip_addr = argv[1];
     if (!is_num(argv[2])) {
-      printf("Usage : %s [<ip-addr>] [<port>]\nProvided port %s isn't valid\n",
-             argv[0], argv[2]);
+      LOG_ERROR("Usage : %s [<ip-addr>] [<port>]\nProvided port %s isn't valid",
+                argv[0], argv[2]);
       return 1;
     }
     port = atoi(argv[2]);
@@ -35,20 +35,20 @@ int main(int argc, char *argv[]) {
 
   int server = socket(AF_INET, SOCK_STREAM, 0);
   if (server == -1) {
-    printf("error creating socket\n");
+    LOG_ERROR("error creating socket");
     return 1;
   }
 
   if (connect(server, (struct sockaddr *)&addr, addr_len) < 0) {
-    printf("error connecting to the server : %s\n", strerror(errno));
+    LOG_ERROR("error connecting to the server : %s", strerror(errno));
     return 1;
   }
 
   // handle connection
-  printf("Connected to server\n");
+  LOG_INFO("connected to server");
   request req = create_req_from_cstr(REQ_LOGIN, "HELLO WORLD!");
   send_req(server, req);
-  printf("request sent!");
+  LOG_INFO("request sent!");
 
   close(server);
 

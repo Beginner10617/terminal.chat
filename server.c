@@ -111,13 +111,11 @@ void pop_request_queue(request_queue *que) {
 }
 
 void debug_print_queue(request_queue que) {
-  printf("Queue([");
+  LOG_INFO("Queue([");
   for (size_t i = 0; i < que.size; i++) {
-    debug_print_request(que.requests[(que.front + i) % que.cap]);
-    if (i != que.size - 1)
-      printf(", ");
+    debug_request(que.requests[(que.front + i) % que.cap]);
   }
-  printf("])");
+  LOG_INFO("])");
 }
 
 bool is_empty_request_queue(request_queue que) { return que.size == 0; }
@@ -140,7 +138,7 @@ void *worker_process(void *arg) {
     while (is_empty_request_queue(w_args->que))
       pthread_cond_wait(&w_args->cond, &w_args->mutex);
     request req = front_request_queue(w_args->que);
-    printf("t_id : %zu queue size : %zu ", w_args->t_id, w_args->que.size);
+    LOG_INFO("t_id : %zu queue size : %zu ", w_args->t_id, w_args->que.size);
     process_request(req);
     pop_request_queue(&w_args->que);
     pthread_mutex_unlock(&w_args->mutex);
@@ -151,8 +149,8 @@ int main(int argc, char *argv[]) {
   int n_threads = DEF_THREADS;
   if (argc == 2) {
     if (!is_num(argv[1])) {
-      printf("Usage : %s [n_threads]\nProvided n_threads %s isn't valid\n",
-             argv[0], argv[1]);
+      LOG_ERROR("Usage : %s [n_threads]\nProvided n_threads %s isn't valid",
+                argv[0], argv[1]);
       return 1;
     }
     n_threads = atoi(argv[1]);
@@ -160,7 +158,7 @@ int main(int argc, char *argv[]) {
 
   int server = socket(AF_INET, SOCK_STREAM, 0);
   if (server == -1) {
-    printf("error creating socket\n");
+    LOG_ERROR("error creating socket");
     return 1;
   }
   struct sockaddr_in addr = {
@@ -171,16 +169,16 @@ int main(int argc, char *argv[]) {
 
   int tmp_i = 1;
   if (setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &tmp_i, sizeof(tmp_i)) < 0) {
-    printf("error setsockopt : %s\n", strerror(errno));
+    LOG_ERROR("error setsockopt : %s", strerror(errno));
     return 1;
   }
 
   if (bind(server, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-    printf("error binding : %s\n", strerror(errno));
+    LOG_ERROR("error binding : %s", strerror(errno));
     return 1;
   }
   if (listen(server, SOMAXCONN) < 0) { // max 5 connection queue
-    printf("error listening : %s\n", strerror(errno));
+    LOG_ERROR("error listening : %s", strerror(errno));
     return 1;
   }
 
@@ -204,17 +202,17 @@ int main(int argc, char *argv[]) {
     pthread_create(&threads[i], NULL, worker_process, &args[i]);
   }
 
-  printf("Server running on port %d\n", PORT);
+  LOG_INFO("Server running on port %d", PORT);
   struct ifaddrs *if_addr;
   if (getifaddrs(&if_addr) < 0) {
-    printf("error getifaddrs : %s\n", strerror(errno));
+    LOG_ERROR("error getifaddrs : %s", strerror(errno));
   }
   for (struct ifaddrs *ifa = if_addr; ifa != NULL; ifa = ifa->ifa_next) {
     if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
       char ip[INET_ADDRSTRLEN];
       inet_ntop(AF_INET, &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr, ip,
                 sizeof(ip));
-      printf("%s: %s\n", ifa->ifa_name, ip);
+      LOG_INFO("%s: %s", ifa->ifa_name, ip);
     }
   }
 
@@ -230,7 +228,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (poll(all_fd, fd_count, TIMEOUT_MS) < 0) {
-      printf("error poll : %s\n", strerror(errno));
+      LOG_ERROR("error poll : %s", strerror(errno));
       continue;
     }
 
@@ -244,8 +242,8 @@ int main(int argc, char *argv[]) {
       }
       tmp_client.is_connected = true;
       append_dyn_arr_client(tmp_client, &client_list);
-      printf("Connected client with file_descriptor = %d\n",
-             tmp_client.file_descriptor);
+      LOG_INFO("connected client with file_descriptor = %d",
+               tmp_client.file_descriptor);
     }
     for (size_t i = 1; i < fd_count; i++) {
       client *tmp_client = &client_list.clients[i - 1];

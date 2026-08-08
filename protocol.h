@@ -7,6 +7,12 @@
 #include <string.h>
 #include <sys/errno.h>
 #include <unistd.h>
+#define LOG_INFO(format, ...)                                                  \
+  fprintf(stderr, "[INFO] " format "\n", ##__VA_ARGS__)
+#define LOG_ERROR(format, ...)                                                 \
+  fprintf(stderr, "[ERROR] " format "\n", ##__VA_ARGS__)
+#define LOG_DEBUG(format, ...)                                                 \
+  fprintf(stderr, "[DEBUG] " format "\n", ##__VA_ARGS__)
 
 typedef enum {
   // disconnect
@@ -47,8 +53,8 @@ typedef struct {
   uint8_t kind, length, *data;
 } request;
 
-void debug_print_request_kind(uint8_t req_k);
-void debug_print_request(request req);
+char *debug_c_str_request_kind(uint8_t req_k);
+void debug_request(request req);
 
 request create_req_from_cstr(uint8_t kind, const char *c_str);
 
@@ -101,88 +107,77 @@ void destroy_request(request *req) {
     free(req->data);
 }
 
-void debug_print_request_kind(uint8_t req_k) {
+char *debug_c_str_request_kind(uint8_t req_k) {
   switch (req_k) {
   case DISCONNECT:
-    printf("DISCONNECT");
-    break;
+    return ("DISCONNECT");
   case REQ_LOGIN:
-    printf("REQ_LOGIN");
-    break;
+    return ("REQ_LOGIN");
   case RSP_LOGIN:
-    printf("RSP_LOGIN");
-    break;
+    return ("RSP_LOGIN");
   case REQ_SIGN_UP:
-    printf("REQ_SIGN_UP");
-    break;
+    return ("REQ_SIGN_UP");
   case RSP_SIGN_UP:
-    printf("RSP_SIGN_UP");
-    break;
+    return ("RSP_SIGN_UP");
   case REQ_LOGOUT:
-    printf("REQ_LOGOUT");
-    break;
+    return ("REQ_LOGOUT");
   case RSP_LOGOUT:
-    printf("RSP_LOGOUT");
-    break;
+    return ("RSP_LOGOUT");
   case REQ_SEARCH_USER:
-    printf("REQ_SEARCH_USER");
-    break;
+    return ("REQ_SEARCH_USER");
   case RSP_SEARCH_USER:
-    printf("RSP_SEARCH_USER");
-    break;
+    return ("RSP_SEARCH_USER");
   case REQ_USER_INFO:
-    printf("REQ_USER_INFO");
-    break;
+    return ("REQ_USER_INFO");
   case RSP_USER_INFO:
-    printf("RSP_USER_INFO");
-    break;
+    return ("RSP_USER_INFO");
   case REQ_MESSAGE_SEND:
-    printf("REQ_MESSAGE_SEND");
-    break;
+    return ("REQ_MESSAGE_SEND");
   case RSP_MESSAGE_SEND:
-    printf("RSP_MESSAGE_SEND");
-    break;
+    return ("RSP_MESSAGE_SEND");
   case NTF_MESSAGE_RECV:
-    printf("NTF_MESSAGE_RECV");
-    break;
+    return ("NTF_MESSAGE_RECV");
   case REQ_CHAT_ACCESS:
-    printf("REQ_CHAT_ACCESS");
-    break;
+    return ("REQ_CHAT_ACCESS");
   case RSP_CHAT_ACCESS:
-    printf("RSP_CHAT_ACCESS");
-    break;
+    return ("RSP_CHAT_ACCESS");
   case REQ_DM_ACCESS:
-    printf("REQ_DM_ACCESS");
-    break;
+    return ("REQ_DM_ACCESS");
   case RSP_DM_ACCESS:
-    printf("RSP_DM_ACCESS");
-    break;
+    return ("RSP_DM_ACCESS");
   case REQ_PING:
-    printf("REQ_PING");
-    break;
+    return ("REQ_PING");
   case RSP_PONG:
-    printf("RSP_PONG");
-    break;
+    return ("RSP_PONG");
   case RSP_ERROR:
-    printf("RSP_ERROR");
-    break;
+    return ("RSP_ERROR");
 
   default:
-    printf("Unknown");
-    break;
+    return ("Unknown");
   }
 }
 
-void debug_print_request(request req) {
-  printf("Request(");
-  debug_print_request_kind(req.kind);
-  printf(", %u, [", req.length);
+void debug_request(request req) {
+  char *tmp = debug_c_str_request_kind(req.kind);
+  size_t sz = strlen(tmp);
+  sz += strlen("Request(");
+  sz += strlen(", uuu, [");
+  sz += 3 * req.length - 1;
+  sz += strlen("])0");
+  char buf[sz];
+  snprintf(buf, sizeof(buf), "Request(%s, %u, [", tmp, req.length);
+  size_t j = strlen(buf);
   for (uint8_t i = 0; i < req.length; i++) {
-    printf("%x", req.data[i]);
-    if (i != req.length - 1)
-      printf(" ");
+    snprintf(buf + j, sizeof(buf) + j, "%x", req.data[i]);
+    j = strlen(buf);
+    if (i != req.length - 1) {
+      snprintf(buf + j, sizeof(buf) + j, " ");
+      j = strlen(buf);
+    }
   }
-  printf("])");
+  snprintf(buf + j, sizeof(buf) + j, "])");
+
+  LOG_INFO("%s", buf);
 }
 
 request recv_req(int file_descriptor) {
@@ -231,15 +226,14 @@ bool is_num(char *c_str) {
   return true;
 }
 void process_request(request req) {
-  printf("Processing : ");
-  debug_print_request(req);
-  printf("\n");
+  LOG_INFO("Processing : ");
+  debug_request(req);
 
   if (req.kind == DISCONNECT) {
     uint8_t *fd_data = req.data;
     int fd = (int)fd_data[0] | ((int)fd_data[1] << 8) |
              ((int)fd_data[2] << 16) | ((int)fd_data[3] << 24);
-    printf("disconnected file_descriptor = %d\n", fd);
+    LOG_INFO("disconnected file_descriptor = %d", fd);
     close(fd);
   }
 }
