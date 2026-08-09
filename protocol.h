@@ -45,7 +45,8 @@ typedef enum {
   REQ_PING,
   RSP_PONG,
   // generic error
-  RSP_ERROR,
+  RSP_ERROR, // send to client
+  REQ_ERROR, // for internal logging
 } REQUEST_RESPONSE_KIND;
 
 typedef struct {
@@ -134,8 +135,6 @@ char *debug_c_str_request_kind(uint8_t req_k) {
     return ("REQ_MESSAGE_SEND");
   case RSP_MESSAGE_SEND:
     return ("RSP_MESSAGE_SEND");
-  case NTF_MESSAGE_RECV:
-    return ("NTF_MESSAGE_RECV");
   case REQ_CHAT_ACCESS:
     return ("REQ_CHAT_ACCESS");
   case RSP_CHAT_ACCESS:
@@ -150,6 +149,8 @@ char *debug_c_str_request_kind(uint8_t req_k) {
     return ("RSP_PONG");
   case RSP_ERROR:
     return ("RSP_ERROR");
+  case REQ_ERROR:
+    return ("REQ_ERROR");
 
   default:
     return ("Unknown");
@@ -184,7 +185,7 @@ request recv_req(int file_descriptor) {
   ssize_t num = read(file_descriptor, &req_header, sizeof(req_header));
   if (num < 0) {
     printf("error recieving request : %s\n", strerror(errno));
-    exit(EXIT_FAILURE);
+    return (request){.kind = REQ_ERROR, .length = 0, .data = NULL};
   }
   if (num == 0) {
     uint8_t *fd_data = malloc(sizeof(4));
@@ -198,7 +199,7 @@ request recv_req(int file_descriptor) {
   uint8_t *req_payload = malloc(req_header[1]);
   if (read(file_descriptor, req_payload, req_header[1]) < 0) {
     printf("error recieving request : %s\n", strerror(errno));
-    exit(EXIT_FAILURE);
+    return (request){.kind = REQ_ERROR, .length = 0, .data = NULL};
   }
   request output = re_construct(req_header, req_payload);
   return output;
@@ -210,7 +211,6 @@ void send_req(int file_descriptor, request req) {
 
   if (write(file_descriptor, flat_req, sz) < 0) {
     printf("error sending to the server : %s\n", strerror(errno));
-    exit(EXIT_FAILURE);
   }
 }
 
