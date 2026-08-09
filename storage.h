@@ -20,15 +20,20 @@ typedef struct {
 } message;
 
 typedef struct {
-  bool (*create_user)(user_cred);
+  void *context;
 
-  bool (*authenticate)(const char *username, const uint8_t *password);
+  bool (*create_user)(void *ctx, user_cred);
 
-  bool (*store_message)(message);
+  bool (*authenticate)(void *ctx, const char *username,
+                       const uint8_t *password);
 
-  bool (*load_messages_to)(const char *to_username);
+  bool (*store_message)(void *ctx, message);
 
-  bool (*delete_message)(message);
+  bool (*load_messages_to)(void *ctx, const char *to_username);
+
+  bool (*delete_message)(void *ctx, message);
 } StorageLayer;
+
+StorageLayer creade_file_based_storage(const char *filepath);
 
 #endif

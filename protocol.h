@@ -184,7 +184,7 @@ request recv_req(int file_descriptor) {
   uint8_t req_header[2];
   ssize_t num = read(file_descriptor, &req_header, sizeof(req_header));
   if (num < 0) {
-    printf("error recieving request : %s\n", strerror(errno));
+    LOG_ERROR("error recieving request : %s\n", strerror(errno));
     return (request){.kind = REQ_ERROR, .length = 0, .data = NULL};
   }
   if (num == 0) {
@@ -198,7 +198,7 @@ request recv_req(int file_descriptor) {
   }
   uint8_t *req_payload = malloc(req_header[1]);
   if (read(file_descriptor, req_payload, req_header[1]) < 0) {
-    printf("error recieving request : %s\n", strerror(errno));
+    LOG_ERROR("error recieving request : %s\n", strerror(errno));
     return (request){.kind = REQ_ERROR, .length = 0, .data = NULL};
   }
   request output = re_construct(req_header, req_payload);
@@ -210,7 +210,7 @@ void send_req(int file_descriptor, request req) {
   uint8_t *flat_req = flatten(req);
 
   if (write(file_descriptor, flat_req, sz) < 0) {
-    printf("error sending to the server : %s\n", strerror(errno));
+    LOG_ERROR("error sending to the server : %s\n", strerror(errno));
   }
 }
 
