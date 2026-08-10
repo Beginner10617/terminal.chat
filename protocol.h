@@ -51,6 +51,7 @@ typedef enum {
 
 typedef struct {
   uint8_t kind, length, *data;
+  int file_descriptor; // to be used to give response
 } request;
 
 char *debug_c_str_request_kind(uint8_t req_k);
@@ -188,13 +189,7 @@ request recv_req(int file_descriptor) {
     return (request){.kind = REQ_ERROR, .length = 0, .data = NULL};
   }
   if (num == 0) {
-    uint8_t *fd_data = malloc(sizeof(4));
-    fd_data[0] = file_descriptor & 0xFF;
-    fd_data[1] = (file_descriptor >> 8) & 0xFF;
-    fd_data[2] = (file_descriptor >> 16) & 0xFF;
-    fd_data[3] = (file_descriptor >> 24) & 0xFF;
-
-    return (request){.kind = DISCONNECT, .length = 4, .data = fd_data};
+    return (request){.kind = DISCONNECT, .length = 0, .data = NULL};
   }
   uint8_t *req_payload = malloc(req_header[1]);
   if (read(file_descriptor, req_payload, req_header[1]) < 0) {
@@ -229,9 +224,7 @@ void process_request(request req) {
   debug_request(req);
 
   if (req.kind == DISCONNECT) {
-    uint8_t *fd_data = req.data;
-    int fd = (int)fd_data[0] | ((int)fd_data[1] << 8) |
-             ((int)fd_data[2] << 16) | ((int)fd_data[3] << 24);
+    int fd = req.file_descriptor;
     LOG_INFO("disconnected file_descriptor = %d", fd);
     close(fd);
   }

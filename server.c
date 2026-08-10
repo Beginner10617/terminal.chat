@@ -251,6 +251,7 @@ int main(int argc, char *argv[]) {
         continue;
       if (all_fd[i].revents & POLLIN) {
         request req = recv_req(all_fd[i].fd);
+        req.file_descriptor = all_fd[i].fd;
         if (req.kind == DISCONNECT)
           tmp_client->is_connected = false;
 
