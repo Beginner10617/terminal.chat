@@ -5,7 +5,6 @@
 #define PROTOCOL_IMPLEMENTATION
 #include "protocol.h"
 #include <arpa/inet.h>
-#include <assert.h>
 #include <ifaddrs.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -62,63 +61,6 @@ void clear_dyn_arr_client(dyn_arr_client *arr) { // remove all disconnected
   }
   arr->size = last_connected + 1;
 }
-
-typedef struct {
-  request *requests;
-  size_t size, cap, front, rear;
-} request_queue;
-
-void init_request_queue(request_queue *que) {
-  que->requests = malloc(sizeof(request));
-  que->cap = 1;
-  que->size = 0;
-  que->front = 0;
-  que->rear = 0;
-}
-
-request front_request_queue(request_queue que) {
-  return que.requests[que.front];
-}
-
-void push_request_queue(request_queue *que, request req) {
-  if (que->size == que->cap) {
-    size_t new_cap = que->cap * 2;
-    request *tmp = malloc(sizeof(request) * new_cap);
-    assert(tmp);
-    for (size_t i = 0; i < que->size; i++) {
-      tmp[i] = que->requests[(que->front + i) % que->cap];
-    }
-    tmp[que->size] = req;
-    que->size++;
-    que->cap = new_cap;
-    que->front = 0;
-    que->rear = que->size;
-    free(que->requests);
-    que->requests = tmp;
-    return;
-  }
-  que->requests[que->rear] = req;
-  que->rear = (que->rear + 1) % que->cap;
-  que->size++;
-}
-
-void pop_request_queue(request_queue *que) {
-  if (que->size == 0)
-    return;
-  free(que->requests[que->front].data);
-  que->front = (que->front + 1) % que->cap;
-  que->size--;
-}
-
-void debug_print_queue(request_queue que) {
-  LOG_INFO("Queue([");
-  for (size_t i = 0; i < que.size; i++) {
-    debug_request(que.requests[(que.front + i) % que.cap]);
-  }
-  LOG_INFO("])");
-}
-
-bool is_empty_request_queue(request_queue que) { return que.size == 0; }
 
 typedef struct {
   request_queue que;

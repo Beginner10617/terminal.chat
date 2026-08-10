@@ -70,6 +70,10 @@ void send_req(int file_descriptor, request req);
 
 void process_request(request req);
 
+typedef struct {
+  request *requests;
+  size_t size, cap, front, rear;
+} request_queue;
 // #define PROTOCOL_IMPLEMENTATION
 #ifdef PROTOCOL_IMPLEMENTATION
 request create_req_from_cstr(uint8_t kind, const char *c_str) {
@@ -181,18 +185,37 @@ void debug_request(request req) {
   LOG_INFO("%s", buf);
 }
 
+bool read_exact(int fd, void *buf, size_t size) {
+  size_t recv = 0;
+  while (recv < size) {
+    ssize_t num = read(fd, (uint8_t *)buf + recv, size - recv);
+    if (num == 0)
+      return false; // disconnected
+    if (num < 0) {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
+    recv += num;
+  }
+  return true;
+}
+
 request recv_req(int file_descriptor) {
   uint8_t req_header[2];
-  ssize_t num = read(file_descriptor, &req_header, sizeof(req_header));
-  if (num < 0) {
-    LOG_ERROR("error recieving request : %s\n", strerror(errno));
+  if (!read_exact(file_descriptor, req_header, sizeof(req_header))) {
+    if (errno == 0)
+      return (request){.kind = DISCONNECT, .length = 0, .data = NULL};
+    LOG_ERROR("error recieving request : %s", strerror(errno));
     return (request){.kind = REQ_ERROR, .length = 0, .data = NULL};
   }
-  if (num == 0) {
-    return (request){.kind = DISCONNECT, .length = 0, .data = NULL};
-  }
   uint8_t *req_payload = malloc(req_header[1]);
-  if (read(file_descriptor, req_payload, req_header[1]) < 0) {
+  if (req_payload == NULL) {
+    LOG_ERROR("error allocating for request payload");
+    return (request){.kind = REQ_ERROR, .length = 0, .data = NULL};
+  }
+  if (!read_exact(file_descriptor, req_payload, req_header[1])) {
+    free(req_payload);
     LOG_ERROR("error recieving request : %s\n", strerror(errno));
     return (request){.kind = REQ_ERROR, .length = 0, .data = NULL};
   }
@@ -229,5 +252,61 @@ void process_request(request req) {
     close(fd);
   }
 }
+
+void init_request_queue(request_queue *que) {
+  que->requests = malloc(sizeof(request));
+  que->cap = 1;
+  que->size = 0;
+  que->front = 0;
+  que->rear = 0;
+}
+
+request front_request_queue(request_queue que) {
+  return que.requests[que.front];
+}
+
+void push_request_queue(request_queue *que, request req) {
+  if (que->size == que->cap) {
+    size_t new_cap = que->cap * 2;
+    request *tmp = malloc(sizeof(request) * new_cap);
+    if (tmp == NULL) {
+      LOG_ERROR("unable to allocate space to expand request queue");
+      return;
+    }
+    for (size_t i = 0; i < que->size; i++) {
+      tmp[i] = que->requests[(que->front + i) % que->cap];
+    }
+    tmp[que->size] = req;
+    que->size++;
+    que->cap = new_cap;
+    que->front = 0;
+    que->rear = que->size;
+    free(que->requests);
+    que->requests = tmp;
+    return;
+  }
+  que->requests[que->rear] = req;
+  que->rear = (que->rear + 1) % que->cap;
+  que->size++;
+}
+
+void pop_request_queue(request_queue *que) {
+  if (que->size == 0)
+    return;
+  free(que->requests[que->front].data);
+  que->front = (que->front + 1) % que->cap;
+  que->size--;
+}
+
+void debug_print_queue(request_queue que) {
+  LOG_INFO("Queue([");
+  for (size_t i = 0; i < que.size; i++) {
+    debug_request(que.requests[(que.front + i) % que.cap]);
+  }
+  LOG_INFO("])");
+}
+
+bool is_empty_request_queue(request_queue que) { return que.size == 0; }
+
 #endif
 #endif
