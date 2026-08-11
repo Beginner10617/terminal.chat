@@ -10,7 +10,8 @@ bool file_based_create_user(void *ctx, user_cred uc) {
   FILE *file = fopen(filepath, "ab");
   if (file == NULL)
     return false;
-  size_t size_of_uc = sizeof(uc) + strlen(uc.username);
+  size_t size_of_uc = MAX_PASSWORD_HASH_SIZE + MAX_PUBLIC_KEY_SIZE +
+                      MAX_SALT_SIZE + strlen(uc.username) + 1;
   fwrite(&size_of_uc, sizeof(size_of_uc), 1, file);
   fwrite(uc.username, 1, strlen(uc.username) + 1, file);
   fwrite(uc.public_key, sizeof(uint8_t), MAX_PUBLIC_KEY_SIZE, file);
@@ -103,6 +104,47 @@ user_cred file_based_find_user(void *ctx, const char *username) {
   return out;
 }
 
+void file_based_delete_user(void *ctx, const char *username) {
+  const char *filepath = ((const char **)ctx)[0];
+  FILE *file = fopen(filepath, "rb+");
+  if (file == NULL) {
+    return;
+  }
+  size_t size_of_curr;
+  bool reading = true;
+  while (reading) {
+    fread(&size_of_curr, sizeof(size_t), 1, file);
+    size_t size_of_username = size_of_curr - MAX_PUBLIC_KEY_SIZE -
+                              MAX_PASSWORD_HASH_SIZE - MAX_SALT_SIZE;
+    printf("size_of_username : %zu\n", size_of_username);
+    printf("size_of_curr : %zu\n", size_of_curr);
+    // return;
+    if (size_of_username != strlen(username) + 1)
+      continue;
+    char tmp_c;
+    size_t i;
+    for (i = 0; i < size_of_username; i++) {
+      size_t n = fread(&tmp_c, sizeof(char), 1, file);
+      if (username[i] != tmp_c) {
+        i++;
+        break;
+      }
+    }
+    if (i != size_of_username) {
+      fseek(file, size_of_curr - i, SEEK_CUR);
+      continue;
+    }
+    reading = false;
+  }
+  fseek(file, -(sizeof(username)), SEEK_CUR);
+  char empty[sizeof(username)];
+  memset(empty, ' ', sizeof(empty));
+  empty[sizeof(username) - 1] = 0;
+  fwrite(empty, sizeof(char), sizeof(empty), file);
+  fclose(file);
+  return;
+}
+
 StorageLayer create_file_based_storage(char *dirpath) {
   const char *user_table_name = "user";
   char **context = malloc(sizeof(char *) * 2);
@@ -114,5 +156,6 @@ StorageLayer create_file_based_storage(char *dirpath) {
   return (StorageLayer){.context = context,
                         .create_user = file_based_create_user,
                         .authenticate = file_based_authenticate,
-                        .find_user = file_based_find_user};
+                        .find_user = file_based_find_user,
+                        .delete_user = file_based_delete_user};
 }

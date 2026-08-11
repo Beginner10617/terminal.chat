@@ -29,6 +29,8 @@ typedef struct {
 
   user_cred (*find_user)(void *ctx, const char *username);
 
+  void (*delete_user)(void *ctx, const char *username);
+
   bool (*store_message)(void *ctx, message);
 
   bool (*load_messages_to)(void *ctx, const char *to_username);
