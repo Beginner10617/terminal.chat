@@ -76,8 +76,12 @@ user_cred file_based_find_user(void *ctx, const char *username) {
       return (user_cred){.username = "not found"};
     size_t size_of_username = size_of_curr - MAX_PUBLIC_KEY_SIZE -
                               MAX_PASSWORD_HASH_SIZE - MAX_SALT_SIZE;
-    if (size_of_username != strlen(username) + 1)
+    // printf("size_of_username : %zu\n", size_of_username);
+    // printf("size_of_curr : %zu\n", size_of_curr);
+    if (size_of_username != strlen(username) + 1) {
+      fseek(file, size_of_curr - sizeof(size_of_username), SEEK_CUR);
       continue;
+    }
     char tmp_c;
     size_t i;
     for (i = 0; i < size_of_username; i++) {
@@ -132,10 +136,10 @@ void file_based_delete_user(void *ctx, const char *username) {
     }
     reading = false;
   }
-  fseek(file, -(sizeof(username)), SEEK_CUR);
-  char empty[sizeof(username)];
+  fseek(file, -(strlen(username) + 1), SEEK_CUR);
+  char empty[strlen(username) + 1];
   memset(empty, ' ', sizeof(empty));
-  empty[sizeof(username) - 1] = 0;
+  empty[strlen(username)] = 0;
   fwrite(empty, sizeof(char), sizeof(empty), file);
   fclose(file);
   return;
