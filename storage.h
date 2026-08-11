@@ -10,7 +10,7 @@
 typedef struct {
   const char *username;
   const uint8_t public_key[MAX_PUBLIC_KEY_SIZE],
-      password_hash[MAX_PASSWORD_HASH_SIZE], salt[8];
+      password_hash[MAX_PASSWORD_HASH_SIZE], salt[MAX_SALT_SIZE];
 } user_cred;
 
 typedef struct {
@@ -25,7 +25,9 @@ typedef struct {
   bool (*create_user)(void *ctx, user_cred);
 
   bool (*authenticate)(void *ctx, const char *username,
-                       const uint8_t *password);
+                       const uint8_t *password_hash);
+
+  bool (*find_user)(const char *username);
 
   bool (*store_message)(void *ctx, message);
 
