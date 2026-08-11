@@ -16,7 +16,7 @@ typedef struct {
 typedef struct {
   const char *from_username, *to_username;
   uint8_t *body;
-  size_t size, table_index;
+  size_t size, msg_id;
 } message;
 
 typedef struct {
@@ -33,9 +33,10 @@ typedef struct {
 
   bool (*store_message)(void *ctx, message);
 
-  bool (*load_messages_to)(void *ctx, const char *to_username);
+  bool (*load_messages)(void *ctx, const char *to_username,
+                        const char *from_username);
 
-  bool (*delete_message)(void *ctx, message);
+  bool (*delete_message)(void *ctx, size_t msg_id);
 } StorageLayer;
 
 StorageLayer create_file_based_storage(char *dirpath);
