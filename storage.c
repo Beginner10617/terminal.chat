@@ -1,10 +1,12 @@
 #include "storage.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 // context = char *paths[2] = {path_user_table, path_messages_table}
 bool file_based_create_user(void *ctx, user_cred uc) {
-  const char *filepath = ((const char **)ctx)[0];
+  char *filepath = ((char **)ctx)[0];
+  printf("filepath : %s\n", filepath);
   FILE *file = fopen(filepath, "ab");
   if (file == NULL)
     return false;
@@ -33,12 +35,19 @@ bool file_based_authenticate(void *ctx, const char *username,
     size_t size_of_username = size_of_curr - MAX_PUBLIC_KEY_SIZE -
                               MAX_PASSWORD_HASH_SIZE - MAX_SALT_SIZE;
     if (size_of_username != strlen(username) + 1)
-      return false;
+      continue;
     char tmp_c;
-    for (size_t i = 0; i < size_of_username; i++) {
+    size_t i;
+    for (i = 0; i < size_of_username; i++) {
       fread(&tmp_c, sizeof(char), 1, file);
-      if (username[i] != tmp_c)
-        return false;
+      if (username[i] != tmp_c) {
+        i++;
+        break;
+      }
+    }
+    if (i != size_of_username) {
+      fseek(file, size_of_curr - i, SEEK_CUR);
+      continue;
     }
     reading = false;
   }
@@ -51,4 +60,59 @@ bool file_based_authenticate(void *ctx, const char *username,
       return false;
   }
   return true;
+}
+
+user_cred file_based_find_user(void *ctx, const char *username) {
+  const char *filepath = ((const char **)ctx)[0];
+  FILE *file = fopen(filepath, "rb");
+  if (file == NULL) {
+    return (user_cred){.username = "error"};
+  }
+  size_t size_of_curr;
+  bool reading = true;
+  while (reading) {
+    size_t n = fread(&size_of_curr, sizeof(size_t), 1, file);
+    if (n == 0)
+      return (user_cred){.username = "not found"};
+    size_t size_of_username = size_of_curr - MAX_PUBLIC_KEY_SIZE -
+                              MAX_PASSWORD_HASH_SIZE - MAX_SALT_SIZE;
+    if (size_of_username != strlen(username) + 1)
+      continue;
+    char tmp_c;
+    size_t i;
+    for (i = 0; i < size_of_username; i++) {
+      size_t n = fread(&tmp_c, sizeof(char), 1, file);
+      if (n == 0)
+        return (user_cred){.username = "not found"};
+      if (username[i] != tmp_c) {
+        i++;
+        break;
+      }
+    }
+    if (i != size_of_username) {
+      fseek(file, size_of_curr - i, SEEK_CUR);
+      continue;
+    }
+    reading = false;
+  }
+  user_cred out = {.username = username};
+  fread(out.public_key, sizeof(uint8_t), MAX_PUBLIC_KEY_SIZE, file);
+  fread(out.password_hash, sizeof(uint8_t), MAX_PASSWORD_HASH_SIZE, file);
+  fread(out.salt, sizeof(uint8_t), MAX_SALT_SIZE, file);
+  fclose(file);
+  return out;
+}
+
+StorageLayer create_file_based_storage(char *dirpath) {
+  const char *user_table_name = "user";
+  char **context = malloc(sizeof(char *) * 2);
+  context[0] =
+      malloc(sizeof(char) * (strlen(dirpath) + strlen(user_table_name) + 1));
+  strcpy(context[0], dirpath);
+  strcat(context[0], user_table_name);
+  printf("context[0] created : %s\n", context[0]);
+  return (StorageLayer){.context = context,
+                        .create_user = file_based_create_user,
+                        .authenticate = file_based_authenticate,
+                        .find_user = file_based_find_user};
 }

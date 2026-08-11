@@ -9,7 +9,7 @@
 
 typedef struct {
   const char *username;
-  const uint8_t public_key[MAX_PUBLIC_KEY_SIZE],
+  uint8_t public_key[MAX_PUBLIC_KEY_SIZE],
       password_hash[MAX_PASSWORD_HASH_SIZE], salt[MAX_SALT_SIZE];
 } user_cred;
 
@@ -27,7 +27,7 @@ typedef struct {
   bool (*authenticate)(void *ctx, const char *username,
                        const uint8_t *password_hash);
 
-  bool (*find_user)(const char *username);
+  user_cred (*find_user)(void *ctx, const char *username);
 
   bool (*store_message)(void *ctx, message);
 
@@ -36,6 +36,6 @@ typedef struct {
   bool (*delete_message)(void *ctx, message);
 } StorageLayer;
 
-StorageLayer creade_file_based_storage(const char *filepath);
+StorageLayer create_file_based_storage(char *dirpath);
 
 #endif
