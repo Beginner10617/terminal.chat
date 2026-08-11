@@ -6,7 +6,6 @@
 // context = char *paths[2] = {path_user_table, path_messages_table}
 bool file_based_create_user(void *ctx, user_cred uc) {
   char *filepath = ((char **)ctx)[0];
-  printf("filepath : %s\n", filepath);
   FILE *file = fopen(filepath, "ab");
   if (file == NULL)
     return false;
@@ -116,9 +115,6 @@ void file_based_delete_user(void *ctx, const char *username) {
     fread(&size_of_curr, sizeof(size_t), 1, file);
     size_t size_of_username = size_of_curr - MAX_PUBLIC_KEY_SIZE -
                               MAX_PASSWORD_HASH_SIZE - MAX_SALT_SIZE;
-    printf("size_of_username : %zu\n", size_of_username);
-    printf("size_of_curr : %zu\n", size_of_curr);
-    // return;
     if (size_of_username != strlen(username) + 1)
       continue;
     char tmp_c;
@@ -152,7 +148,6 @@ StorageLayer create_file_based_storage(char *dirpath) {
       malloc(sizeof(char) * (strlen(dirpath) + strlen(user_table_name) + 1));
   strcpy(context[0], dirpath);
   strcat(context[0], user_table_name);
-  printf("context[0] created : %s\n", context[0]);
   return (StorageLayer){.context = context,
                         .create_user = file_based_create_user,
                         .authenticate = file_based_authenticate,
