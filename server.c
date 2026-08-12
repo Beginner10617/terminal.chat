@@ -40,7 +40,12 @@ void append_dyn_arr_client(client _client, dyn_arr_client *arr) {
   if (arr->size >= arr->cap) {
     while (arr->size >= arr->cap)
       arr->cap *= 2;
-    arr->clients = realloc(arr->clients, sizeof(client) * arr->cap);
+    client *tmp_c = realloc(arr->clients, sizeof(client) * arr->cap);
+    if (tmp_c == NULL) {
+      LOG_ERROR("unable to allocate space for new clients");
+      return;
+    }
+    arr->clients = tmp_c;
   }
   arr->clients[arr->size] = _client;
   arr->size++;

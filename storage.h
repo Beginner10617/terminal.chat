@@ -3,6 +3,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#define LOG_INFO(format, ...)                                                  \
+  fprintf(stderr, "[INFO] " format "\n", ##__VA_ARGS__)
+#define LOG_ERROR(format, ...)                                                 \
+  fprintf(stderr, "[ERROR] " format "\n", ##__VA_ARGS__)
+#define LOG_DEBUG(format, ...)                                                 \
+  fprintf(stderr, "[DEBUG] " format "\n", ##__VA_ARGS__)
 #define MAX_PUBLIC_KEY_SIZE 1024
 #define MAX_PASSWORD_HASH_SIZE 256
 #define MAX_SALT_SIZE 8
@@ -20,6 +26,13 @@ typedef struct {
 } message;
 
 typedef struct {
+  message *msgs;
+  size_t size, cap;
+} message_s;
+void init_message_s(message_s *);
+void append_message_s(message_s *, message);
+
+typedef struct {
   void *context;
 
   bool (*create_user)(void *ctx, user_cred);
@@ -33,10 +46,10 @@ typedef struct {
 
   bool (*store_message)(void *ctx, message);
 
-  bool (*load_messages)(void *ctx, const char *to_username,
-                        const char *from_username);
+  message_s (*load_messages)(void *ctx, const char *to_username,
+                             const char *from_username);
 
-  bool (*delete_message)(void *ctx, size_t msg_id);
+  void (*delete_message)(void *ctx, size_t msg_id);
 } StorageLayer;
 
 StorageLayer create_file_based_storage(char *dirpath);

@@ -3,6 +3,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+void init_message_s(message_s *msgs) {
+  msgs->cap = 1;
+  msgs->size = 0;
+  msgs->msgs = malloc(sizeof(message));
+  if (msgs->msgs == NULL) {
+    LOG_ERROR("unable to allocate space for initlising message_s");
+    return;
+  }
+}
+
+void append_message_s(message_s *msgs, message msg) {
+  if (msgs->size == msgs->cap) {
+    message *tmp;
+    msgs->cap *= 2;
+    tmp = realloc(msgs->msgs, msgs->cap);
+    if (tmp == NULL) {
+      LOG_ERROR("unable to allocate space for new message");
+      return;
+    }
+    msgs->msgs = tmp;
+  }
+  msgs->msgs[msgs->size] = msg;
+  msgs->size++;
+  return;
+}
+
 // context = char *paths[2] = {path_user_table, path_messages_table}
 bool file_based_create_user(void *ctx, user_cred uc) {
   char *filepath = ((char **)ctx)[0];
@@ -145,6 +172,44 @@ void file_based_delete_user(void *ctx, const char *username) {
   return;
 }
 
+bool file_based_store_message(void *ctx, message msg) {
+  const char *filepath = ((const char **)ctx)[1];
+  FILE *file = fopen(filepath, "ab");
+  if (file == NULL)
+    return false;
+  size_t size = strlen(msg.from_username) + strlen(msg.to_username) + 2 +
+                msg.size + sizeof(msg.msg_id);
+  fwrite(&size, sizeof(size), 1, file);
+  fwrite(msg.from_username, sizeof(char), strlen(msg.from_username) + 1, file);
+  fwrite(msg.to_username, sizeof(char), strlen(msg.to_username) + 1, file);
+  fwrite(msg.body, 1, msg.size, file);
+  fwrite(&msg.msg_id, sizeof(msg.msg_id), 1, file);
+  fclose(file);
+  return true;
+}
+
+message_s file_based_load_messages(void *ctx, const char *to_username,
+                                   const char *from_username) {
+  message_s out = {NULL, 0, 1};
+  const char *filepath = ((char **)ctx)[1];
+  FILE *file = fopen(filepath, "rb");
+  if (file == NULL)
+    return out;
+  init_message_s(&out);
+  size_t size_of_curr;
+  while (true) {
+    size_t n = fread(&size_of_curr, sizeof(size_of_curr), 1, file);
+    if (n == 0) {
+      break;
+    }
+    // compare the strings (null terminated)
+    // if not match, jump with appropriate offset
+    // if match, construct and append the message object to out
+    // IMP : verify n != 0 on all fread() calls
+  }
+  return out;
+}
+
 StorageLayer create_file_based_storage(char *dirpath) {
   const char *user_table_name = "user";
   char **context = malloc(sizeof(char *) * 2);
@@ -156,5 +221,7 @@ StorageLayer create_file_based_storage(char *dirpath) {
                         .create_user = file_based_create_user,
                         .authenticate = file_based_authenticate,
                         .find_user = file_based_find_user,
-                        .delete_user = file_based_delete_user};
+                        .delete_user = file_based_delete_user,
+                        .store_message = file_based_store_message,
+                        .load_messages = file_based_load_messages};
 }
