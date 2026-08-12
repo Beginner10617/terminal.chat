@@ -190,7 +190,7 @@ bool file_based_store_message(void *ctx, message msg) {
 
 message_s file_based_load_messages(void *ctx, const char *to_username,
                                    const char *from_username) {
-  message_s out = {NULL, 0, 1};
+  message_s out = {NULL, 0, 0};
   const char *filepath = ((char **)ctx)[1];
   FILE *file = fopen(filepath, "rb");
   if (file == NULL)
@@ -200,14 +200,124 @@ message_s file_based_load_messages(void *ctx, const char *to_username,
   while (true) {
     size_t n = fread(&size_of_curr, sizeof(size_of_curr), 1, file);
     if (n == 0) {
-      break;
+      fclose(file);
+      return out;
     }
     // compare the strings (null terminated)
+    char tmp_c;
+    size_t index = 0;
+    bool match = true;
+    while (match) {
+      n = fread(&tmp_c, 1, 1, file);
+      if (n == 0) {
+        fclose(file);
+        return out;
+      }
+      if (tmp_c != from_username[index]) {
+        match = false;
+        break;
+      }
+      if (tmp_c == 0 || from_username[index] == 0)
+        break;
+      index++;
+    }
     // if not match, jump with appropriate offset
+    if (!match) {
+      fseek(file, -((long)index + 1), SEEK_CUR);
+      fseek(file, size_of_curr, SEEK_CUR);
+      continue;
+    }
+    index = 0;
+    while (match) {
+      n = fread(&tmp_c, 1, 1, file);
+      if (n == 0) {
+        fclose(file);
+        return out;
+      }
+      if (tmp_c != to_username[index]) {
+        match = false;
+        break;
+      }
+      if (tmp_c == 0 || to_username[index] == 0)
+        break;
+      index++;
+    }
+    if (!match) {
+      fseek(file, -(long)(index + strlen(from_username) + 2), SEEK_CUR);
+      fseek(file, size_of_curr, SEEK_CUR);
+      continue;
+    }
     // if match, construct and append the message object to out
+    message msg = {from_username, to_username, NULL,
+                   size_of_curr - strlen(from_username) - strlen(to_username) -
+                       sizeof(size_t) - 2,
+                   0};
+    msg.body = malloc(msg.size);
+    if (msg.body == NULL) {
+      LOG_ERROR("unable to allocate space for readin message body");
+      fclose(file);
+      return out;
+    }
+    n = fread(msg.body, 1, msg.size, file);
+    if (n == 0) {
+      free(msg.body);
+      fclose(file);
+      return out;
+    }
+    n = fread(&msg.msg_id, sizeof(msg.msg_id), 1, file);
+    if (n == 0) {
+      free(msg.body);
+      fclose(file);
+      return out;
+    }
+    append_message_s(&out, msg);
     // IMP : verify n != 0 on all fread() calls
   }
   return out;
+}
+
+void file_based_delete_message(void *ctx, size_t msg_id) {
+  const char *filepath = ((char **)ctx)[1];
+  FILE *file = fopen(filepath, "rb+");
+  if (file == NULL)
+    return;
+  size_t size_of_curr;
+  while (true) {
+    size_t n = fread(&size_of_curr, sizeof(size_of_curr), 1, file);
+    if (n == 0)
+      break;
+    fseek(file, size_of_curr - sizeof(size_t), SEEK_CUR);
+    size_t id;
+    n = fread(&id, sizeof(id), 1, file);
+    if (n == 0)
+      break;
+    if (id != msg_id)
+      continue;
+    fseek(file, -(long)size_of_curr, SEEK_CUR);
+    char tmp_c;
+    do {
+      n = fread(&tmp_c, 1, 1, file);
+      if (n == 0)
+        break;
+      if (tmp_c) {
+        fseek(file, -1, SEEK_CUR);
+        fwrite(" ", 1, 1, file);
+        fseek(file, 0, SEEK_CUR);
+      }
+    } while (tmp_c);
+    do {
+      n = fread(&tmp_c, 1, 1, file);
+      if (n == 0)
+        break;
+      if (tmp_c) {
+        fseek(file, -1, SEEK_CUR);
+        fwrite(" ", 1, 1, file);
+        fseek(file, 0, SEEK_CUR);
+      }
+    } while (tmp_c);
+    break;
+  }
+  fclose(file);
 }
 
 StorageLayer create_file_based_storage(char *dirpath) {
@@ -223,5 +333,6 @@ StorageLayer create_file_based_storage(char *dirpath) {
                         .find_user = file_based_find_user,
                         .delete_user = file_based_delete_user,
                         .store_message = file_based_store_message,
-                        .load_messages = file_based_load_messages};
+                        .load_messages = file_based_load_messages,
+                        .delete_message = file_based_delete_message};
 }
