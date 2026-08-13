@@ -69,9 +69,12 @@ int main(int argc, char *argv[]) {
 
   // handle connection
   LOG_INFO("connected to server");
-  request req = create_req_from_cstr(REQ_LOGIN, "HELLO WORLD!");
+  request req = (request){REQ_PING, 0, NULL};
   send_req(ssl, req);
-  LOG_INFO("request sent!");
+  LOG_INFO("ping request sent!");
+  request pong = recv_req(ssl);
+  LOG_INFO("recieved response:");
+  debug_request(pong);
 
   SSL_shutdown(ssl);
   SSL_free(ssl);

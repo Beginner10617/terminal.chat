@@ -113,14 +113,14 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  if (SSL_CTX_use_certificate_file(
-        ctx, "certs/server.crt", SSL_FILETYPE_PEM) <= 0) {
+  if (SSL_CTX_use_certificate_file(ctx, "certs/server.crt", SSL_FILETYPE_PEM) <=
+      0) {
     ERR_print_errors_fp(stderr);
     exit(1);
   }
 
-  if (SSL_CTX_use_PrivateKey_file(
-        ctx, "certs/server.key", SSL_FILETYPE_PEM) <= 0) {
+  if (SSL_CTX_use_PrivateKey_file(ctx, "certs/server.key", SSL_FILETYPE_PEM) <=
+      0) {
     ERR_print_errors_fp(stderr);
     exit(1);
   }
@@ -219,14 +219,14 @@ int main(int argc, char *argv[]) {
       if (ssl == NULL) {
         ERR_print_errors_fp(stderr);
         close(tmp_client.file_descriptor);
-	continue;
+        continue;
       }
       SSL_set_fd(ssl, tmp_client.file_descriptor);
       if (SSL_accept(ssl) <= 0) {
         ERR_print_errors_fp(stderr);
         SSL_free(ssl);
         close(tmp_client.file_descriptor);
-	continue;
+        continue;
       }
 
       tmp_client.ssl = ssl;

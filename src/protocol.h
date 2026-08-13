@@ -233,6 +233,7 @@ request recv_req(SSL *ssl) {
     return (request){.kind = REQ_ERROR, .length = 0, .data = NULL};
   }
   request output = re_construct(req_header, req_payload);
+  output.ssl = ssl;
   return output;
 }
 
@@ -258,14 +259,19 @@ bool is_num(char *c_str) {
 void process_request(request req) {
   LOG_INFO("Processing : ");
   debug_request(req);
+  int fd = req.file_descriptor;
+  SSL *ssl = req.ssl;
 
   if (req.kind == DISCONNECT) {
-    int fd = req.file_descriptor;
-    SSL *ssl = req.ssl;
     LOG_INFO("disconnected file_descriptor = %d", fd);
     SSL_shutdown(ssl);
     SSL_free(ssl);
     close(fd);
+  }
+  if (req.kind == REQ_PING) {
+    request pong = (request){.kind = RSP_PONG, .length = 0, .data = NULL};
+    send_req(req.ssl, pong);
+    destroy_request(&pong);
   }
 }
 
