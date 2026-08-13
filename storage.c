@@ -18,7 +18,7 @@ void append_message_s(message_s *msgs, message msg) {
   if (msgs->size == msgs->cap) {
     message *tmp;
     msgs->cap *= 2;
-    tmp = realloc(msgs->msgs, msgs->cap);
+    tmp = realloc(msgs->msgs, msgs->cap * sizeof(message));
     if (tmp == NULL) {
       LOG_ERROR("unable to allocate space for new message");
       return;
@@ -193,8 +193,9 @@ message_s file_based_load_messages(void *ctx, const char *to_username,
   message_s out = {NULL, 0, 0};
   const char *filepath = ((char **)ctx)[1];
   FILE *file = fopen(filepath, "rb");
-  if (file == NULL)
+  if (file == NULL) {
     return out;
+  }
   init_message_s(&out);
   size_t size_of_curr;
   while (true) {
@@ -322,11 +323,16 @@ void file_based_delete_message(void *ctx, size_t msg_id) {
 
 StorageLayer create_file_based_storage(char *dirpath) {
   const char *user_table_name = "user";
+  const char *msgs_table_name = "msgs";
   char **context = malloc(sizeof(char *) * 2);
   context[0] =
       malloc(sizeof(char) * (strlen(dirpath) + strlen(user_table_name) + 1));
+  context[1] =
+      malloc(sizeof(char) * (strlen(dirpath) + strlen(user_table_name) + 1));
   strcpy(context[0], dirpath);
   strcat(context[0], user_table_name);
+  strcpy(context[1], dirpath);
+  strcat(context[1], msgs_table_name);
   return (StorageLayer){.context = context,
                         .create_user = file_based_create_user,
                         .authenticate = file_based_authenticate,
