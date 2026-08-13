@@ -1,3 +1,0 @@
-FOR i IN [1,num-of-items]:
-  <8B-size-of-this-row>
-  <data>

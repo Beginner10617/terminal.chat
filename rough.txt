@@ -1,0 +1,30 @@
+FOR i IN [1,num-of-items]:
+  <8B-size-of-this-row>
+  <data>
+
+LAYOUT:
+┌──────────────────────────────────────────────────────────────────────┐
+│  TUIChat                                      User: alice    [●]     │
+├───────────────────┬──────────────────────────────────────────────────┤
+│                   │                                                  │
+│  Conversations    │  Bob                                             │
+│                   │  ──────────────────────────────────────────────  │
+│  > Bob            │                                                  │
+│    Charlie        │       Hey, are you working on the TUI?           │
+│    David          │                                                  │
+│    Eve            │                    Yeah, almost done.            │
+│                   │                                                  │
+│                   │       How are you handling resizing?             │
+│                   │                                                  │
+│                   │                    Still figuring that out :)    │
+│                   │                                                  │
+├───────────────────┴──────────────────────────────────────────────────┤
+│ > Type a message...                                                  │
+├──────────────────────────────────────────────────────────────────────┤
+│  ↑↓ Navigate   Enter Send   Ctrl+K Search   Esc Back   Ctrl+Q Quit   │
+└──────────────────────────────────────────────────────────────────────┘
+
+MODE BASED (LIKE VIM), MODES:
+1. NORMAL MODE (NAVIGATE CONVERSATION WINDOWS)
+2. SEARCH MODE (A SEARCH BAR TO SEARCH USERS)
+3. CHAT MODE (TYPE MESSAGES TO THE SELECTED CONVERSATION, SELECTED IN NORMAL MODE)
