@@ -114,13 +114,13 @@ int main(int argc, char *argv[]) {
   }
 
   if (SSL_CTX_use_certificate_file(
-        ctx, "server.crt", SSL_FILETYPE_PEM) <= 0) {
+        ctx, "certs/server.crt", SSL_FILETYPE_PEM) <= 0) {
     ERR_print_errors_fp(stderr);
     exit(1);
   }
 
   if (SSL_CTX_use_PrivateKey_file(
-        ctx, "server.key", SSL_FILETYPE_PEM) <= 0) {
+        ctx, "certs/server.key", SSL_FILETYPE_PEM) <= 0) {
     ERR_print_errors_fp(stderr);
     exit(1);
   }
