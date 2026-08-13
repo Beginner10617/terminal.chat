@@ -1,5 +1,6 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
+#include <openssl/ssl.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -52,6 +53,7 @@ typedef enum {
 typedef struct {
   uint8_t kind, length, *data;
   int file_descriptor; // to be used to give response
+  SSL *ssl;
 } request;
 
 char *debug_c_str_request_kind(uint8_t req_k);
@@ -65,8 +67,8 @@ request re_construct(uint8_t *header, uint8_t *raw_data);
 
 void destroy_request(request *req);
 
-request recv_req(int file_descriptor);
-void send_req(int file_descriptor, request req);
+request recv_req(SSL *ssl);
+void send_req(SSL *ssl, request req);
 
 void process_request(request req);
 
@@ -185,25 +187,36 @@ void debug_request(request req) {
   LOG_INFO("%s", buf);
 }
 
-bool read_exact(int fd, void *buf, size_t size) {
+bool read_exact(SSL *ssl, void *buf, size_t size) {
   size_t recv = 0;
   while (recv < size) {
-    ssize_t num = read(fd, (uint8_t *)buf + recv, size - recv);
-    if (num == 0)
-      return false; // disconnected
-    if (num < 0) {
-      if (errno == EINTR)
-        continue;
-      return false;
+    int num = SSL_read(ssl, (uint8_t *)buf + recv, size - recv);
+    if (num <= 0) {
+      int err = SSL_get_error(ssl, num);
+
+      switch (err) {
+      case SSL_ERROR_ZERO_RETURN:
+        // Clean TLS shutdown (close_notify)
+        return false;
+
+      case SSL_ERROR_SYSCALL:
+        LOG_ERROR("underlying socket error / unexpected EOF");
+        return false;
+
+      default:
+        // Actual TLS error
+        ERR_print_errors_fp(stderr);
+        return false;
+      }
     }
     recv += num;
   }
   return true;
 }
 
-request recv_req(int file_descriptor) {
+request recv_req(SSL *ssl) {
   uint8_t req_header[2];
-  if (!read_exact(file_descriptor, req_header, sizeof(req_header))) {
+  if (!read_exact(ssl, req_header, sizeof(req_header))) {
     if (errno == 0)
       return (request){.kind = DISCONNECT, .length = 0, .data = NULL};
     LOG_ERROR("error recieving request : %s", strerror(errno));
@@ -214,7 +227,7 @@ request recv_req(int file_descriptor) {
     LOG_ERROR("error allocating for request payload");
     return (request){.kind = REQ_ERROR, .length = 0, .data = NULL};
   }
-  if (!read_exact(file_descriptor, req_payload, req_header[1])) {
+  if (!read_exact(ssl, req_payload, req_header[1])) {
     free(req_payload);
     LOG_ERROR("error recieving request : %s\n", strerror(errno));
     return (request){.kind = REQ_ERROR, .length = 0, .data = NULL};
@@ -223,11 +236,11 @@ request recv_req(int file_descriptor) {
   return output;
 }
 
-void send_req(int file_descriptor, request req) {
+void send_req(SSL *ssl, request req) {
   size_t sz = size(req);
   uint8_t *flat_req = flatten(req);
 
-  if (write(file_descriptor, flat_req, sz) < 0) {
+  if (SSL_write(ssl, flat_req, sz) < 0) {
     LOG_ERROR("error sending to the server : %s\n", strerror(errno));
   }
 }
@@ -248,7 +261,10 @@ void process_request(request req) {
 
   if (req.kind == DISCONNECT) {
     int fd = req.file_descriptor;
+    SSL *ssl = req.ssl;
     LOG_INFO("disconnected file_descriptor = %d", fd);
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
     close(fd);
   }
 }

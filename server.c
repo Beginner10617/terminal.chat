@@ -1,3 +1,5 @@
+#include <openssl/err.h>
+#include <openssl/ssl.h>
 #include <poll.h>
 #include <pthread.h>
 #include <stddef.h>
@@ -20,6 +22,7 @@
 
 typedef struct {
   int file_descriptor;
+  SSL *ssl;
   struct sockaddr_storage addr;
   socklen_t addr_len;
   bool is_connected;
@@ -57,7 +60,6 @@ void clear_dyn_arr_client(dyn_arr_client *arr) { // remove all disconnected
     last_connected--;
   for (ssize_t curr = last_connected; curr >= 0; curr--) {
     if (!arr->clients[curr].is_connected) {
-      close(arr->clients[curr].file_descriptor);
       client tmp = arr->clients[last_connected];
       arr->clients[last_connected] = arr->clients[curr];
       arr->clients[curr] = tmp;
@@ -101,6 +103,31 @@ int main(int argc, char *argv[]) {
       return 1;
     }
     n_threads = atoi(argv[1]);
+  }
+
+  OPENSSL_init_ssl(0, NULL);
+  SSL_CTX *ctx = SSL_CTX_new(TLS_server_method());
+
+  if (ctx == NULL) {
+    ERR_print_errors_fp(stderr);
+    exit(1);
+  }
+
+  if (SSL_CTX_use_certificate_file(
+        ctx, "server.crt", SSL_FILETYPE_PEM) <= 0) {
+    ERR_print_errors_fp(stderr);
+    exit(1);
+  }
+
+  if (SSL_CTX_use_PrivateKey_file(
+        ctx, "server.key", SSL_FILETYPE_PEM) <= 0) {
+    ERR_print_errors_fp(stderr);
+    exit(1);
+  }
+
+  if (!SSL_CTX_check_private_key(ctx)) {
+    ERR_print_errors_fp(stderr);
+    exit(1);
   }
 
   int server = socket(AF_INET, SOCK_STREAM, 0);
@@ -187,6 +214,22 @@ int main(int argc, char *argv[]) {
       if (tmp_client.file_descriptor < 0) {
         continue;
       }
+      SSL *ssl = SSL_new(ctx);
+
+      if (ssl == NULL) {
+        ERR_print_errors_fp(stderr);
+        close(tmp_client.file_descriptor);
+	continue;
+      }
+      SSL_set_fd(ssl, tmp_client.file_descriptor);
+      if (SSL_accept(ssl) <= 0) {
+        ERR_print_errors_fp(stderr);
+        SSL_free(ssl);
+        close(tmp_client.file_descriptor);
+	continue;
+      }
+
+      tmp_client.ssl = ssl;
       tmp_client.is_connected = true;
       append_dyn_arr_client(tmp_client, &client_list);
       LOG_INFO("connected client with file_descriptor = %d",
@@ -197,7 +240,7 @@ int main(int argc, char *argv[]) {
       if (!tmp_client->is_connected)
         continue;
       if (all_fd[i].revents & POLLIN) {
-        request req = recv_req(all_fd[i].fd);
+        request req = recv_req(tmp_client->ssl);
         req.file_descriptor = all_fd[i].fd;
         if (req.kind == DISCONNECT)
           tmp_client->is_connected = false;
@@ -224,6 +267,6 @@ int main(int argc, char *argv[]) {
     }
     clear_dyn_arr_client(&client_list);
   }
-
+  SSL_CTX_free(ctx);
   return 0;
 }
