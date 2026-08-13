@@ -27,12 +27,12 @@ typedef enum {
   // logout
   REQ_LOGOUT,
   RSP_LOGOUT,
-  // search other users to chat
+  // search other users to chat using prefix search
   REQ_SEARCH_USER,
   RSP_SEARCH_USER,
-  // request user info or a particular username (bio etc)
-  REQ_USER_INFO,
-  RSP_USER_INFO,
+  // opening chat with a user (diff from searching)
+  REQ_FIND_USER,
+  RSP_FIND_USER,
   // send message to other users
   REQ_MESSAGE_SEND,
   RSP_MESSAGE_SEND,

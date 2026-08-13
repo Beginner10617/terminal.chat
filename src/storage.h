@@ -42,6 +42,8 @@ typedef struct {
 
   user_cred (*find_user)(void *ctx, const char *username);
 
+  const char** (*search_user)(void *ctx, const char *search_str); // prefix search
+
   void (*delete_user)(void *ctx, const char *username);
 
   bool (*store_message)(void *ctx, message);
