@@ -29,3 +29,9 @@
 
 # Mac specific
 .DS_Store
+
+# TLS development certificates
+*.key
+*.pem
+*.crt
+*.csr
