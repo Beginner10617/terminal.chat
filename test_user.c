@@ -1,4 +1,4 @@
-#include "storage.h"
+#include "src/storage.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -8,6 +8,18 @@ int main() {
   printf("context[0] after creation : %s\n", ((char **)stl.context)[0]);
   if (stl.create_user(stl.context, (user_cred){"hello", {1}, {1}, {1}})) {
     printf("succesfully created user hello!\n");
+  } else {
+    printf("error creating user hello\n");
+    return 1;
+  }
+  if (stl.create_user(stl.context, (user_cred){"bello", {1}, {1}, {1}})) {
+    printf("succesfully created user bello!\n");
+  } else {
+    printf("error creating user hello\n");
+    return 1;
+  }
+  if (stl.create_user(stl.context, (user_cred){"hells", {1}, {1}, {1}})) {
+    printf("succesfully created user hells!\n");
   } else {
     printf("error creating user hello\n");
     return 1;
@@ -35,6 +47,14 @@ int main() {
   } else {
     printf("authentication failed\n");
     return 1;
+  }
+
+  char **result = stl.search_user(stl.context, "hel");
+  printf("Search for hel:\n");
+  size_t i = 0;
+  while (result[i]) {
+    printf("%s\n", result[i]);
+    i++;
   }
 
   printf("deleting user hello...\n");

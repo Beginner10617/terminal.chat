@@ -33,6 +33,13 @@ void init_message_s(message_s *);
 void append_message_s(message_s *, message);
 
 typedef struct {
+  char **strings;
+  size_t size, cap;
+} str_list;
+void init_str_list(str_list *);
+void append_str_list(str_list *, char *);
+
+typedef struct {
   void *context;
 
   bool (*create_user)(void *ctx, user_cred);
@@ -42,7 +49,8 @@ typedef struct {
 
   user_cred (*find_user)(void *ctx, const char *username);
 
-  const char** (*search_user)(void *ctx, const char *search_str); // prefix search
+  char **(*search_user)(void *ctx,
+                        const char *search_str); // prefix search
 
   void (*delete_user)(void *ctx, const char *username);
 

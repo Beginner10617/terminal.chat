@@ -30,6 +30,31 @@ void append_message_s(message_s *msgs, message msg) {
   return;
 }
 
+void init_str_list(str_list *s) {
+  s->cap = 1;
+  s->size = 0;
+  s->strings = malloc(sizeof(char *));
+  if (s->strings == NULL) {
+    LOG_ERROR("unable to allocate space for initlising str_list");
+    return;
+  }
+}
+
+void append_str_list(str_list *list, char *str) {
+  if (list->size == list->cap) {
+    size_t new_cap = 2 * list->cap;
+    char **tmp = realloc(list->strings, new_cap * sizeof(char *));
+    if (tmp == NULL) {
+      LOG_ERROR("unable to allocate space for initlising str_list");
+      return;
+    }
+    list->cap *= 2;
+    list->strings = tmp;
+  }
+  list->strings[list->size] = str;
+  list->size++;
+}
+
 // context = char *paths[2] = {path_user_table, path_messages_table}
 bool file_based_create_user(void *ctx, user_cred uc) {
   char *filepath = ((char **)ctx)[0];
@@ -132,6 +157,73 @@ user_cred file_based_find_user(void *ctx, const char *username) {
   fread(out.salt, sizeof(uint8_t), MAX_SALT_SIZE, file);
   fclose(file);
   return out;
+}
+
+char **file_based_seatch_user(void *ctx, const char *search_str) {
+  str_list lst = {.strings = NULL};
+
+  const char *filepath = ((const char **)ctx)[0];
+  FILE *file = fopen(filepath, "rb");
+  if (file == NULL) {
+    return lst.strings;
+  }
+  init_str_list(&lst);
+
+  size_t size_of_curr;
+  while (true) {
+    size_t n = fread(&size_of_curr, sizeof(size_of_curr), 1, file);
+    if (n == 0) {
+      fclose(file);
+      break;
+    }
+    char tmp_c;
+    size_t index, str_size = strlen(search_str);
+    for (index = 0; index < str_size; index++) {
+      n = fread(&tmp_c, 1, 1, file);
+      if (n == 0) {
+        fclose(file);
+        append_str_list(&lst, NULL);
+        return lst.strings;
+      };
+      if (tmp_c != search_str[index]) {
+        index++;
+        break;
+      }
+    }
+    if (index != str_size) {
+      fseek(file, size_of_curr - index, SEEK_CUR);
+      continue;
+    }
+
+    size_t str_s = index;
+    while (tmp_c) {
+      n = fread(&tmp_c, 1, 1, file);
+      if (n == 0) {
+        fclose(file);
+        append_str_list(&lst, NULL);
+        return lst.strings;
+      }
+      str_s++;
+    };
+    fseek(file, -((long)str_s), SEEK_CUR);
+    char *str = malloc(sizeof(char) * str_s);
+    index = 0;
+    do {
+      n = fread(&tmp_c, 1, 1, file);
+      if (n == 0) {
+        fclose(file);
+        append_str_list(&lst, NULL);
+        free(str);
+        return lst.strings;
+      }
+      str[index] = tmp_c;
+      index++;
+    } while (tmp_c);
+    append_str_list(&lst, str);
+    fseek(file, size_of_curr - str_s, SEEK_CUR);
+  }
+  append_str_list(&lst, NULL);
+  return lst.strings;
 }
 
 void file_based_delete_user(void *ctx, const char *username) {
@@ -337,6 +429,7 @@ StorageLayer create_file_based_storage(char *dirpath) {
                         .create_user = file_based_create_user,
                         .authenticate = file_based_authenticate,
                         .find_user = file_based_find_user,
+                        .search_user = file_based_seatch_user,
                         .delete_user = file_based_delete_user,
                         .store_message = file_based_store_message,
                         .load_messages = file_based_load_messages,
