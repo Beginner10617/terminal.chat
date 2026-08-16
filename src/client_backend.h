@@ -19,6 +19,9 @@ typedef struct {
   char *username;
   bool logged_in;
   client_status status;
+  char **user_search_results;
+  char *current_dm;
+  message_s *dm_messages;
 } client_data;
 
 client_data init(const char *ip, unsigned int port);
@@ -28,13 +31,14 @@ void create_account(client_data *, const char *username, const char *password);
 void login(client_data *, const char *username, const char *password);
 void logout(client_data *);
 void save_login_info(const char *username);
-const char **load_login_info();
+void load_login_info(); // auto-load username
 
-const char **search_user(client_data *,
-                         const char *search_str); // prefix search
-message_s get_chat_history(client_data *, const char *user);
+void search_user(client_data *,
+                 const char *search_str); // prefix search
+void update_recent_user(client_data *);
+void get_chat_history(client_data *, const char *user);
 void send_message(client_data *, const char *user, const char *message);
 void delete_message(client_data *, const char *user, size_t message_id);
 
-bool check_ping(client_data *);
+void check_ping(client_data *);
 #endif
