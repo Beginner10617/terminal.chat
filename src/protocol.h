@@ -1,5 +1,6 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
+#include <openssl/err.h>
 #include <openssl/ssl.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -134,10 +135,6 @@ char *debug_c_str_request_kind(uint8_t req_k) {
     return ("REQ_SEARCH_USER");
   case RSP_SEARCH_USER:
     return ("RSP_SEARCH_USER");
-  case REQ_USER_INFO:
-    return ("REQ_USER_INFO");
-  case RSP_USER_INFO:
-    return ("RSP_USER_INFO");
   case REQ_MESSAGE_SEND:
     return ("REQ_MESSAGE_SEND");
   case RSP_MESSAGE_SEND:
