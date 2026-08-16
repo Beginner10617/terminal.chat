@@ -52,7 +52,11 @@ client_data init(const char *ip, unsigned int port) {
                      .server_fd = server,
                      .username = NULL,
                      .logged_in = false,
-                     .status = CLIENT_NOT_LOGGED_IN};
+                     .status = CLIENT_NOT_LOGGED_IN,
+                     .user_search_results = NULL,
+                     .current_dm = NULL,
+                     .dm_messages = NULL
+  };
   return out;
 }
 
@@ -62,8 +66,77 @@ void close_client(client_data cd) {
   close(cd.server_fd);
 }
 
-void create_account(client_data *cd, const char *username, const char *password){
-  
+bool compare_req(request req, const char *str){
+  if (req.length != strlen(str)) return false;
+  for(size_t i = 0; i < req.length; i++){
+    if(req.data[i] != str[i]) return false;
+  }
+  return true;
+}
+
+void create_account(client_data *cd,  char *username, const char *password){
+  char *data = malloc(strlen(username) + strlen(password) + 1);
+  for(size_t i = 0; i < strlen(username); i++) data[i] = username[i];
+  data[strlen(username)] = 0;
+  for(size_t i = 0; i <strlen(password); i++) data[i + strlen(username) + 1] = password[i];
+  request req = create_req_from_cstr(REQ_SIGN_UP, data);
+  send_req(cd->server_ssl, req);
+  destroy_request(&req);
+  request rsp = recv_req(cd->server_ssl);
+  if (rsp.kind == RSP_SIGN_UP && compare_req(rsp, "OK")) {
+    cd->username = username;
+    cd->logged_in = true;
+    cd->status = CLIENT_USERNAME_TAKEN;
+  } else if (rsp.kind == RSP_SIGN_UP && compare_req(req, "IN USE")){
+    cd->status = CLIENT_INVALID_INPUT; // Username already in use
+  } else if (rsp.kind == RSP_ERROR){
+    cd->status = CLIENT_SERVER_ERROR; // Server side error
+  }
+}
+
+void login(client_data *cd, char *username, const char *password){
+  char *data = malloc(strlen(username) + strlen(password) + 1);
+  for(size_t i = 0; i < strlen(username); i++) data[i] = username[i];
+  data[strlen(username)] = 0;
+  for(size_t i = 0; i <strlen(password); i++) data[i + strlen(username) + 1] = password[i];
+  request req = create_req_from_cstr(REQ_LOGIN, data);
+  send_req(cd->server_ssl, req);
+  destroy_request(&req);
+  request rsp = recv_req(cd->server_ssl);
+  if (rsp.kind == RSP_LOGIN && compare_req(rsp, "OK")) {
+    cd->username = username;
+    cd->logged_in = true;
+    cd->status = CLIENT_USERNAME_TAKEN;
+  } else if (rsp.kind == RSP_LOGIN && compare_req(rsp, "WRONG")){
+    // incorrect username or password
+    cd->status =   CLIENT_AUTH_FAILED;
+  } else if (rsp.kind == RSP_ERROR){
+    cd->status = CLIENT_SERVER_ERROR; // Server side error
+  }
+}
+
+void logout(client_data *cd){
+  request req = create_req_from_cstr(REQ_LOGOUT, "");
+  send_req(cd->server_ssl, req);
+  destroy_request(&req);
+  request rsp = recv_req(cd->server_ssl);
+  if (rsp.kind == REQ_LOGOUT && compare_req(rsp, "OK")){
+    cd->status = CLIENT_NOT_LOGGED_IN;
+    cd->logged_in = false;
+    cd->username = NULL;
+    if(cd->user_search_results){
+      free(cd->user_search_results);
+      cd->user_search_results = NULL;
+    }
+    cd->current_dm = NULL;
+    if(cd->dm_messages.msgs) {
+      for(size_t i = 0; i < cd->dm_messages.size; i++) destroy_message(&cd->dm_messages.msgs[i]);
+      free(cd->dm_messages.msgs);
+    }
+    cd->dm_messages.msgs = NULL;
+  } else if (rsp.kind == RSP_ERROR){
+    cd->status = CLIENT_SERVER_ERROR; // Server side error
+  }
 }
 
 #define DEF_IP "127.0.0.1"

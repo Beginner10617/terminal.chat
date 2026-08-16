@@ -24,6 +24,7 @@ typedef struct {
   uint8_t *body;
   size_t size, msg_id;
 } message;
+void destroy_message(message *);
 
 typedef struct {
   message *msgs;

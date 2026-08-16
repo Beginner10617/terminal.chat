@@ -4,6 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+void destroy_message(message *m) {
+  if (!m)
+    return;
+  free(m->body);
+  m->body = NULL;
+}
+
 void init_message_s(message_s *msgs) {
   msgs->cap = 1;
   msgs->size = 0;

@@ -55,6 +55,7 @@ typedef struct {
   uint8_t kind, length, *data;
   int file_descriptor; // to be used to give response
   SSL *ssl;
+  char *username;
 } request;
 
 char *debug_c_str_request_kind(uint8_t req_k);

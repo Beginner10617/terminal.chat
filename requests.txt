@@ -1,0 +1,7 @@
+Creating account / login:
+<username> 0 <password>
+
+Logout/search user:
+<username>
+
+

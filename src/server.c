@@ -26,6 +26,7 @@ typedef struct {
   struct sockaddr_storage addr;
   socklen_t addr_len;
   bool is_connected;
+  char *username;
 } client;
 
 typedef struct {
@@ -231,6 +232,7 @@ int main(int argc, char *argv[]) {
 
       tmp_client.ssl = ssl;
       tmp_client.is_connected = true;
+      tmp_client.username = NULL;
       append_dyn_arr_client(tmp_client, &client_list);
       LOG_INFO("connected client with file_descriptor = %d",
                tmp_client.file_descriptor);
@@ -242,6 +244,7 @@ int main(int argc, char *argv[]) {
       if (all_fd[i].revents & POLLIN) {
         request req = recv_req(tmp_client->ssl);
         req.file_descriptor = all_fd[i].fd;
+        req.username = tmp->username;
         if (req.kind == DISCONNECT)
           tmp_client->is_connected = false;
 

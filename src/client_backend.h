@@ -21,14 +21,14 @@ typedef struct {
   client_status status;
   char **user_search_results;
   char *current_dm;
-  message_s *dm_messages;
+  message_s dm_messages;
 } client_data;
 
 client_data init(const char *ip, unsigned int port);
 void close_client(client_data);
 
-void create_account(client_data *, const char *username, const char *password);
-void login(client_data *, const char *username, const char *password);
+void create_account(client_data *, char *username, const char *password);
+void login(client_data *, char *username, const char *password);
 void logout(client_data *);
 void save_login_info(const char *username);
 void load_login_info(); // auto-load username
